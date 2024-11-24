@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -61,7 +62,10 @@ class DataPipeline:
         """
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-        return config
+            if config is None:
+                logger.error(f"Failed to load configuration from {config_path}")
+                raise ValueError("Configuration file is empty or invalid")
+            return config
 
     def load_all_datasets(self) -> Dict[str, pd.DataFrame]:
         """
@@ -123,7 +127,6 @@ class DataPipeline:
             if 'renewable_share' in datasets:
                 logger.info("Merging with renewable_share")
                 renewable_share = datasets['renewable_share'].copy()
-                # Rename Entity to country for merge
                 if 'Entity' in renewable_share.columns:
                     renewable_share = renewable_share.rename(columns={'Entity': 'country'})
                 merged_df = merged_df.merge(
@@ -152,7 +155,14 @@ class DataPipeline:
             logger.info(f"Columns used for total generation: {twh_columns}")
 
             if twh_columns:
-                merged_df['total_renewable_generation'] = merged_df[twh_columns].sum(axis=1)
+                merged_df['renewable_generation'] = merged_df[twh_columns].sum(axis=1)
+
+            # Clean up duplicate columns and standardize names
+            # Drop duplicate Code columns
+            if 'Code_x' in merged_df.columns:
+                merged_df = merged_df.drop(columns=['Code_x'])
+            if 'Code_y' in merged_df.columns:
+                merged_df = merged_df.drop(columns=['Code_y'])
 
             # Rename columns for consistency
             column_mapping = {
@@ -162,15 +172,28 @@ class DataPipeline:
                 'Biofuel(TWh)': 'biofuel_generation',
                 'Geothermal (TWh)': 'geothermal_generation',
                 'consumption_twh': 'total_energy_consumption',
-                'Renewables (% equivalent primary energy)': 'renewable_share',
+                'Renewables (% equivalent primary energy)': 'renewable_share_pct',
                 'Solar Generation - TWh': 'solar_generation_alt',
                 'Wind Generation - TWh': 'wind_generation',
-                'Hydro Generation - TWh': 'hydro_generation_alt'
+                'Hydro Generation - TWh': 'hydro_generation_alt',
+                'Geo Biomass Other - TWh': 'other_renewable_generation'
             }
 
             # Only rename columns that exist
             columns_to_rename = {k: v for k, v in column_mapping.items() if k in merged_df.columns}
             merged_df = merged_df.rename(columns=columns_to_rename)
+
+            # Ensure required columns are present
+            required_columns = [
+                'year',
+                'country',
+                'renewable_generation',
+                'total_energy_consumption'
+            ]
+
+            missing_columns = [col for col in required_columns if col not in merged_df.columns]
+            if missing_columns:
+                raise ValueError(f"Missing required columns after merging: {missing_columns}")
 
             logger.info(f"Final merged dataset shape: {merged_df.shape}")
             logger.info(f"Final columns: {list(merged_df.columns)}")
@@ -201,13 +224,22 @@ class DataPipeline:
         if len(df) < min_rows:
             raise ValueError(f"Dataset has fewer than {min_rows} rows")
 
-        # Check date range
-        if 'date' in df.columns:
-            min_date = pd.to_datetime(self.config['data_validation']['min_date'])
-            max_date = pd.to_datetime(self.config['data_validation']['max_date'])
-            df['date'] = pd.to_datetime(df['date'])
-            if df['date'].min() > min_date or df['date'].max() < max_date:
-                raise ValueError("Data does not cover required date range")
+        # Check date range if year column is present
+        if 'year' in df.columns:
+            min_year = int(pd.to_datetime(self.config['data_validation']['min_date']).year)
+            max_year = int(pd.to_datetime(self.config['data_validation']['max_date']).year)
+
+            if df['year'].min() > min_year or df['year'].max() < max_year:
+                logger.warning(f"Data year range ({df['year'].min()}-{df['year'].max()}) "
+                               f"differs from configured range ({min_year}-{max_year})")
+
+        # Check for invalid values in key columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isna().all():
+                logger.warning(f"Column {col} contains all missing values")
+            elif (df[col] < 0).any():
+                logger.warning(f"Column {col} contains negative values")
 
         logger.info("Data validation successful")
 
@@ -359,22 +391,70 @@ def create_default_config() -> Dict:
     return config
 
 
+def create_default_config() -> Dict:
+    """
+    Create default configuration for the pipeline.
+    """
+    return {
+        'data_paths': {
+            'base_dir': 'data',
+            'output_dir': 'processed_data'
+        },
+        'data_validation': {
+            'required_columns': [
+                'country',
+                'year',
+                'renewable_generation',
+                'total_energy_consumption'
+            ],
+            'min_rows': 1000,
+            'min_date': '1965-01-01',
+            'max_date': '2022-12-31'
+        },
+        'preprocessing': {
+            'handle_missing': True,
+            'numeric_missing_strategy': 'knn',
+            'categorical_missing_strategy': 'mode',
+            'remove_outliers': True,
+            'outlier_method': 'iqr',
+            'outlier_threshold': 3.0,
+            'date_column': 'year',
+            'target_column': 'renewable_generation',
+            'lag_periods': [1, 3, 6, 12],
+            'rolling_windows': [3, 6, 12],
+            'group_column': 'country',
+            'normalize': True,
+            'normalization_method': 'standard'
+        },
+        'feature_engineering': {
+            'renewable_cols': [
+                'hydro_generation',
+                'solar_generation',
+                'wind_generation'
+            ],
+            'total_energy_col': 'total_energy_consumption',
+            'create_weather_features': True
+        }
+    }
+
+
 def main():
     """
     Main execution function.
     """
     try:
-        config_path = Path('config.yaml')
+        config_yaml = Path('config.yaml')
 
-        if not config_path.exists():
-            logger.info("Creating default configuration...")
-            config = create_default_config()
-            with open(config_path, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False)
-            logger.info("Created default configuration file")
+        # Create a fresh config file
+        logger.info("Creating configuration file...")
+        config = create_default_config()
+
+        with open(config_yaml, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+        logger.info(f"Created configuration file at {config_yaml}")
 
         # Initialize and run pipeline
-        pipeline = DataPipeline(str(config_path))
+        pipeline = DataPipeline(str(config_yaml))
         pipeline.run_pipeline()
 
     except Exception as e:

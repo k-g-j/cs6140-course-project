@@ -6,46 +6,27 @@ data_validation:
   min_date: '1965-01-01'
   min_rows: 1000
   required_columns:
-    - country
-    - year
-    - renewable_generation
-    - total_energy_consumption
+  - country
+  - year
+  - renewable_generation
+  - total_energy_consumption
 feature_engineering:
-  capacity_cols:
-    - solar_capacity
-    - wind_capacity
-    - hydro_capacity
   create_weather_features: true
-  feature_pairs:
-    - - gdp_per_capita
-      - renewable_share
-    - - policy_support_index
-      - renewable_growth
-  gdp_col: gdp
-  policy_cols:
-    - feed_in_tariff
-    - renewable_portfolio_standard
-    - carbon_tax
-  population_col: population
-  region_col: continent
-  regional_target_cols:
-    - renewable_share
-    - energy_intensity
   renewable_cols:
-    - solar_generation
-    - wind_generation
-    - hydro_generation
+  - hydro_generation
+  - solar_generation
+  - wind_generation
   total_energy_col: total_energy_consumption
 preprocessing:
   categorical_missing_strategy: mode
-  date_column: date
+  date_column: year
   group_column: country
   handle_missing: true
   lag_periods:
-    - 1
-    - 3
-    - 6
-    - 12
+  - 1
+  - 3
+  - 6
+  - 12
   normalization_method: standard
   normalize: true
   numeric_missing_strategy: knn
@@ -53,7 +34,7 @@ preprocessing:
   outlier_threshold: 3.0
   remove_outliers: true
   rolling_windows:
-    - 3
-    - 6
-    - 12
+  - 3
+  - 6
+  - 12
   target_column: renewable_generation

@@ -1,10 +1,4 @@
 import logging
-from typing import Dict, List, Tuple, Optional, Union
-
-import numpy as np
-import pandas as pd
-from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 
 # Set up logging
 logging.basicConfig(
@@ -13,56 +7,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+import logging
+from typing import Dict, List, Tuple, Optional, Union
+
+import numpy as np
+import pandas as pd
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
+logger = logging.getLogger(__name__)
+
 
 class DataPreprocessor:
-    """
-    A class to handle all preprocessing steps for renewable energy data.
-    """
+    """A class to handle all preprocessing steps for renewable energy data."""
 
     def __init__(self):
         self.numeric_imputer = SimpleImputer(strategy='mean')
         self.categorical_imputer = SimpleImputer(strategy='constant', fill_value='Unknown')
         self.scaler = StandardScaler()
         self.knn_imputer = KNNImputer(n_neighbors=5)
-
-    def remove_outliers(self,
-                        df: pd.DataFrame,
-                        columns: List[str],
-                        method: str = 'iqr',
-                        threshold: float = 3.0) -> pd.DataFrame:
-        """
-        Remove outliers from specified columns using either IQR or z-score method.
-
-        Args:
-            df: Input DataFrame
-            columns: List of columns to check for outliers
-            method: Either 'iqr' or 'zscore'
-            threshold: Z-score threshold or IQR multiplier
-
-        Returns:
-            DataFrame with outliers removed
-        """
-        df_clean = df.copy()
-
-        for column in columns:
-            if method == 'iqr':
-                Q1 = df_clean[column].quantile(0.25)
-                Q3 = df_clean[column].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                df_clean = df_clean[
-                    (df_clean[column] >= lower_bound) &
-                    (df_clean[column] <= upper_bound)
-                    ]
-
-            elif method == 'zscore':
-                z_scores = np.abs((df_clean[column] - df_clean[column].mean()) /
-                                  df_clean[column].std())
-                df_clean = df_clean[z_scores < threshold]
-
-        logger.info(f"Removed outliers from {columns} using {method} method")
-        return df_clean
 
     def handle_missing_values(self,
                               df: pd.DataFrame,
@@ -103,13 +66,51 @@ class DataPreprocessor:
         logger.info("Handled missing values using specified strategies")
         return df_clean
 
+    def remove_outliers(self,
+                        df: pd.DataFrame,
+                        columns: List[str],
+                        method: str = 'iqr',
+                        threshold: float = 3.0) -> pd.DataFrame:
+        """
+        Remove outliers from specified columns.
+
+        Args:
+            df: Input DataFrame
+            columns: Columns to check for outliers
+            method: 'iqr' or 'zscore'
+            threshold: Threshold for outlier detection
+
+        Returns:
+            DataFrame with outliers removed
+        """
+        df_clean = df.copy()
+
+        for column in columns:
+            if method == 'iqr':
+                Q1 = df_clean[column].quantile(0.25)
+                Q3 = df_clean[column].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                df_clean = df_clean[
+                    (df_clean[column] >= lower_bound) &
+                    (df_clean[column] <= upper_bound)
+                    ]
+            elif method == 'zscore':
+                z_scores = np.abs((df_clean[column] - df_clean[column].mean()) /
+                                  df_clean[column].std())
+                df_clean = df_clean[z_scores < threshold]
+
+        logger.info(f"Removed outliers from {columns} using {method} method")
+        return df_clean
+
     def normalize_columns(self,
                           df: pd.DataFrame,
                           columns: List[str],
                           method: str = 'standard') -> Tuple[
         pd.DataFrame, Union[StandardScaler, MinMaxScaler, RobustScaler]]:
         """
-        Normalize specified columns using the chosen method.
+        Normalize specified columns.
 
         Args:
             df: Input DataFrame
@@ -135,39 +136,36 @@ class DataPreprocessor:
 
         return df_normalized, scaler
 
-    def create_temporal_features(self,
-                                 df: pd.DataFrame,
-                                 date_column: str) -> pd.DataFrame:
+    def create_temporal_features(self, df: pd.DataFrame, time_column: str) -> pd.DataFrame:
         """
-        Create temporal features from date column.
+        Create temporal features from year or date column.
 
         Args:
             df: Input DataFrame
-            date_column: Name of the date column
+            time_column: Name of the time column (year or date)
 
         Returns:
             DataFrame with additional temporal features
         """
         df_temporal = df.copy()
 
-        # Convert to datetime if not already
-        df_temporal[date_column] = pd.to_datetime(df_temporal[date_column])
+        if time_column == 'date' and 'date' in df_temporal.columns:
+            # Convert to datetime if it's a date column
+            df_temporal['date'] = pd.to_datetime(df_temporal['date'])
+            df_temporal['year'] = df_temporal['date'].dt.year
+            df_temporal['month'] = df_temporal['date'].dt.month
+            df_temporal['quarter'] = df_temporal['date'].dt.quarter
+            df_temporal['day_of_week'] = df_temporal['date'].dt.dayofweek
+            df_temporal['is_weekend'] = df_temporal['day_of_week'].isin([5, 6]).astype(int)
 
-        # Extract basic temporal features
-        df_temporal['year'] = df_temporal[date_column].dt.year
-        df_temporal['month'] = df_temporal[date_column].dt.month
-        df_temporal['quarter'] = df_temporal[date_column].dt.quarter
-        df_temporal['day_of_week'] = df_temporal[date_column].dt.dayofweek
-        df_temporal['week_of_year'] = df_temporal[date_column].dt.isocalendar().week
-
-        # Create seasonal features
-        df_temporal['is_weekend'] = df_temporal['day_of_week'].isin([5, 6]).astype(int)
-        df_temporal['season'] = df_temporal['month'].map({
-            12: 'Winter', 1: 'Winter', 2: 'Winter',
-            3: 'Spring', 4: 'Spring', 5: 'Spring',
-            6: 'Summer', 7: 'Summer', 8: 'Summer',
-            9: 'Fall', 10: 'Fall', 11: 'Fall'
-        })
+        elif time_column == 'year' and 'year' in df_temporal.columns:
+            # If we only have year data, create decade and period features
+            df_temporal['decade'] = (df_temporal['year'] // 10) * 10
+            df_temporal['period'] = pd.cut(
+                df_temporal['year'],
+                bins=[1960, 1970, 1980, 1990, 2000, 2010, 2020, 2030],
+                labels=['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s']
+            )
 
         logger.info("Created temporal features")
         return df_temporal
@@ -178,7 +176,7 @@ class DataPreprocessor:
                             lag_periods: List[int],
                             group_column: Optional[str] = None) -> pd.DataFrame:
         """
-        Create lagged features for the target column.
+        Create lagged features with support for yearly data.
 
         Args:
             df: Input DataFrame
@@ -192,12 +190,16 @@ class DataPreprocessor:
         df_lag = df.copy()
 
         if group_column:
+            # Sort by year within each group
+            df_lag = df_lag.sort_values([group_column, 'year'])
             for lag in lag_periods:
                 df_lag[f'{target_column}_lag_{lag}'] = (
                     df_lag.groupby(group_column)[target_column]
                     .shift(lag)
                 )
         else:
+            # Sort by year
+            df_lag = df_lag.sort_values('year')
             for lag in lag_periods:
                 df_lag[f'{target_column}_lag_{lag}'] = df_lag[target_column].shift(lag)
 
@@ -210,7 +212,7 @@ class DataPreprocessor:
                                 windows: List[int],
                                 group_column: Optional[str] = None) -> pd.DataFrame:
         """
-        Create rolling window features for the target column.
+        Create rolling window features.
 
         Args:
             df: Input DataFrame
@@ -223,40 +225,43 @@ class DataPreprocessor:
         """
         df_rolling = df.copy()
 
-        for window in windows:
-            if group_column:
+        if group_column:
+            # Sort by year within each group
+            df_rolling = df_rolling.sort_values([group_column, 'year'])
+            for window in windows:
                 df_rolling[f'{target_column}_rolling_mean_{window}'] = (
                     df_rolling.groupby(group_column)[target_column]
-                    .rolling(window=window)
+                    .rolling(window=window, min_periods=1)
                     .mean()
                     .reset_index(0, drop=True)
                 )
                 df_rolling[f'{target_column}_rolling_std_{window}'] = (
                     df_rolling.groupby(group_column)[target_column]
-                    .rolling(window=window)
+                    .rolling(window=window, min_periods=1)
                     .std()
                     .reset_index(0, drop=True)
                 )
-            else:
+        else:
+            # Sort by year
+            df_rolling = df_rolling.sort_values('year')
+            for window in windows:
                 df_rolling[f'{target_column}_rolling_mean_{window}'] = (
                     df_rolling[target_column]
-                    .rolling(window=window)
+                    .rolling(window=window, min_periods=1)
                     .mean()
                 )
                 df_rolling[f'{target_column}_rolling_std_{window}'] = (
                     df_rolling[target_column]
-                    .rolling(window=window)
+                    .rolling(window=window, min_periods=1)
                     .std()
                 )
 
         logger.info(f"Created rolling features for {target_column}")
         return df_rolling
 
-    def preprocess_dataset(self,
-                           df: pd.DataFrame,
-                           config: Dict) -> pd.DataFrame:
+    def preprocess_dataset(self, df: pd.DataFrame, config: Dict) -> pd.DataFrame:
         """
-        Main preprocessing pipeline that applies all necessary transformations.
+        Main preprocessing pipeline.
 
         Args:
             df: Input DataFrame
@@ -267,57 +272,60 @@ class DataPreprocessor:
         """
         logger.info("Starting preprocessing pipeline...")
 
+        df_processed = df.copy()
+
         # Handle missing values
         if config.get('handle_missing', True):
-            df = self.handle_missing_values(
-                df,
+            df_processed = self.handle_missing_values(
+                df_processed,
                 numeric_strategy=config.get('numeric_missing_strategy', 'knn'),
                 categorical_strategy=config.get('categorical_missing_strategy', 'mode')
             )
 
         # Remove outliers if specified
         if config.get('remove_outliers', True):
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            df = self.remove_outliers(
-                df,
+            numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
+            df_processed = self.remove_outliers(
+                df_processed,
                 columns=numeric_cols,
                 method=config.get('outlier_method', 'iqr'),
                 threshold=config.get('outlier_threshold', 3.0)
             )
 
-        # Create temporal features if date column specified
-        if 'date_column' in config:
-            df = self.create_temporal_features(df, config['date_column'])
+        # Create temporal features
+        time_column = 'year' if 'year' in df_processed.columns else config.get('date_column')
+        if time_column in df_processed.columns:
+            df_processed = self.create_temporal_features(df_processed, time_column)
 
-        # Create lag features if specified
+        # Create lag features
         if 'target_column' in config and 'lag_periods' in config:
-            df = self.create_lag_features(
-                df,
+            df_processed = self.create_lag_features(
+                df_processed,
                 config['target_column'],
                 config['lag_periods'],
                 config.get('group_column')
             )
 
-        # Create rolling features if specified
+        # Create rolling features
         if 'target_column' in config and 'rolling_windows' in config:
-            df = self.create_rolling_features(
-                df,
+            df_processed = self.create_rolling_features(
+                df_processed,
                 config['target_column'],
                 config['rolling_windows'],
                 config.get('group_column')
             )
 
-        # Normalize numeric columns if specified
+        # Normalize if specified
         if config.get('normalize', True):
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            df, _ = self.normalize_columns(
-                df,
+            numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
+            df_processed, _ = self.normalize_columns(
+                df_processed,
                 columns=numeric_cols,
                 method=config.get('normalization_method', 'standard')
             )
 
         logger.info("Preprocessing pipeline completed successfully")
-        return df
+        return df_processed
 
 
 def main():

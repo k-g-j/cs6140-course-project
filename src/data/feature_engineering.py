@@ -267,42 +267,73 @@ class FeatureEngineer:
         if config.get('create_weather_features', False):
             df_features = self.create_weather_features(df_features)
 
-        # Create economic features
-        if 'gdp_col' in config and 'population_col' in config:
+        # Create economic features if required columns exist
+        if ('gdp_col' in config and 'population_col' in config and
+                config['gdp_col'] in df_features.columns and
+                config['population_col'] in df_features.columns):
+            logger.info("Creating economic features...")
             df_features = self.create_economic_features(
                 df_features,
                 config['gdp_col'],
                 config['population_col']
             )
+        else:
+            logger.warning("Skipping economic features due to missing GDP or population data")
 
-        # Create policy features
-        if 'policy_cols' in config:
+        # Create policy features if required columns exist
+        if ('policy_cols' in config and
+                all(col in df_features.columns for col in config['policy_cols'])):
+            logger.info("Creating policy features...")
             df_features = self.create_policy_features(
                 df_features,
                 config['policy_cols']
             )
+        else:
+            logger.warning("Skipping policy features due to missing policy data")
 
-        # Create technical features
-        if 'capacity_cols' in config:
+        # Create technical features if required columns exist
+        if ('capacity_cols' in config and
+                any(col in df_features.columns for col in config['capacity_cols'])):
+            logger.info("Creating technical features...")
+            available_cols = [col for col in config['capacity_cols']
+                              if col in df_features.columns]
             df_features = self.create_technical_features(
                 df_features,
-                config['capacity_cols']
+                available_cols
             )
+        else:
+            logger.warning("Skipping technical features due to missing capacity data")
 
-        # Create interaction features
+        # Create interaction features if possible
         if 'feature_pairs' in config:
-            df_features = self.create_interaction_features(
-                df_features,
-                config['feature_pairs']
-            )
+            valid_pairs = []
+            for pair in config['feature_pairs']:
+                if all(feat in df_features.columns for feat in pair):
+                    valid_pairs.append(pair)
 
-        # Create regional features
-        if 'region_col' in config and 'regional_target_cols' in config:
-            df_features = self.create_regional_features(
-                df_features,
-                config['region_col'],
-                config['regional_target_cols']
-            )
+            if valid_pairs:
+                logger.info("Creating interaction features...")
+                df_features = self.create_interaction_features(
+                    df_features,
+                    valid_pairs
+                )
+            else:
+                logger.warning("Skipping interaction features due to missing columns")
+
+        # Create regional features if possible
+        if ('region_col' in config and 'regional_target_cols' in config and
+                config['region_col'] in df_features.columns):
+            available_targets = [col for col in config['regional_target_cols']
+                                 if col in df_features.columns]
+            if available_targets:
+                logger.info("Creating regional features...")
+                df_features = self.create_regional_features(
+                    df_features,
+                    config['region_col'],
+                    available_targets
+                )
+            else:
+                logger.warning("Skipping regional features due to missing target columns")
 
         logger.info("Feature engineering pipeline completed successfully")
         return df_features
