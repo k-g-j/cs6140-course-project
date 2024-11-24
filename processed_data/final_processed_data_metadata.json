@@ -1,7 +1,7 @@
 {
-    "processing_date": "2024-11-24T13:55:31.539080",
+    "processing_date": "2024-11-24T15:59:50.145388",
     "num_rows": 643,
-    "num_columns": 31,
+    "num_columns": 25,
     "columns": [
         "year",
         "hydro_generation",
@@ -27,15 +27,9 @@
         "renewable_generation_rolling_mean_6",
         "renewable_generation_rolling_std_6",
         "renewable_generation_rolling_mean_12",
-        "renewable_generation_rolling_std_12",
-        "total_renewable",
-        "renewable_share",
-        "hydro_generation_share",
-        "solar_generation_share",
-        "wind_generation_share",
-        "renewable_yoy_growth"
+        "renewable_generation_rolling_std_12"
     ],
-    "memory_usage": 0.18350696563720703,
+    "memory_usage": 0.15407276153564453,
     "data_types": {
         "year": "float64",
         "hydro_generation": "float64",
@@ -61,13 +55,7 @@
         "renewable_generation_rolling_mean_6": "float64",
         "renewable_generation_rolling_std_6": "float64",
         "renewable_generation_rolling_mean_12": "float64",
-        "renewable_generation_rolling_std_12": "float64",
-        "total_renewable": "float64",
-        "renewable_share": "float64",
-        "hydro_generation_share": "float64",
-        "solar_generation_share": "float64",
-        "wind_generation_share": "float64",
-        "renewable_yoy_growth": "float64"
+        "renewable_generation_rolling_std_12": "float64"
     },
     "missing_values": {
         "year": 0,
@@ -94,13 +82,7 @@
         "renewable_generation_rolling_mean_6": 0,
         "renewable_generation_rolling_std_6": 38,
         "renewable_generation_rolling_mean_12": 0,
-        "renewable_generation_rolling_std_12": 38,
-        "total_renewable": 0,
-        "renewable_share": 0,
-        "hydro_generation_share": 0,
-        "solar_generation_share": 0,
-        "wind_generation_share": 0,
-        "renewable_yoy_growth": 38
+        "renewable_generation_rolling_std_12": 38
     },
     "configuration": {
         "data_paths": {

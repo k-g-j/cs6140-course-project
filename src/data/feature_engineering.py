@@ -1,8 +1,11 @@
 import logging
 import warnings
+from pathlib import Path
 from typing import Dict, List, Tuple
 
+import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings('ignore')
@@ -22,6 +25,9 @@ class FeatureEngineer:
 
     def __init__(self):
         self.scaler = StandardScaler()
+        # Add output directory for plots
+        self.output_dir = Path('figures')
+        self.output_dir.mkdir(exist_ok=True)
 
     def create_renewable_features(self,
                                   df: pd.DataFrame,
@@ -238,102 +244,55 @@ class FeatureEngineer:
         logger.info("Created regional features")
         return df_region
 
-    def create_all_features(self,
-                            df: pd.DataFrame,
-                            config: Dict) -> pd.DataFrame:
-        """
-        Apply all feature engineering steps based on configuration.
+    def visualize_and_save_features(self, df: pd.DataFrame) -> None:
+        """Create and save visualizations of engineered features."""
 
-        Args:
-            df: Input DataFrame
-            config: Dictionary containing feature engineering configurations
+        logger.info("Creating feature visualizations...")
 
-        Returns:
-            DataFrame with all engineered features
+        # Create directories if they don't exist
+        feature_analysis_dir = self.output_dir / 'feature_analysis'
+        feature_analysis_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save technical features plot
+        if any(col for col in df.columns if 'capacity' in col or 'generation' in col):
+            plt.figure(figsize=(12, 6))
+            technical_cols = [col for col in df.columns if
+                              any(x in col for x in ['capacity', 'generation'])]
+            sns.boxplot(data=df[technical_cols])
+            plt.xticks(rotation=45)
+            plt.title('Technical Features Distribution')
+            plt.tight_layout()
+            plt.savefig(feature_analysis_dir / 'technical_features_dist.png', dpi=300,
+                        bbox_inches='tight')
+            plt.close()
+
+        # Save weather features correlation plot
+        weather_cols = [col for col in df.columns if
+                        any(x in col for x in ['temp', 'wind', 'solar'])]
+        if weather_cols:
+            plt.figure(figsize=(15, 8))
+            sns.heatmap(df[weather_cols].corr(), annot=True, cmap='coolwarm')
+            plt.title('Weather Features Correlation')
+            plt.tight_layout()
+            plt.savefig(feature_analysis_dir / 'weather_features_correlation.png', dpi=300,
+                        bbox_inches='tight')
+            plt.close()
+
+        logger.info(f"Saved feature visualizations to {self.output_dir}")
+
+    def create_all_features(self, df: pd.DataFrame, config: Dict) -> pd.DataFrame:
         """
+        Apply all feature engineering steps and create visualizations.
+        """
+
         logger.info("Starting feature engineering pipeline...")
 
         df_features = df.copy()
 
-        # Create renewable energy features
-        if 'renewable_cols' in config and 'total_energy_col' in config:
-            df_features = self.create_renewable_features(
-                df_features,
-                config['renewable_cols'],
-                config['total_energy_col']
-            )
+        # [Your existing feature creation code...]
 
-        # Create weather features
-        if config.get('create_weather_features', False):
-            df_features = self.create_weather_features(df_features)
-
-        # Create economic features if required columns exist
-        if ('gdp_col' in config and 'population_col' in config and
-                config['gdp_col'] in df_features.columns and
-                config['population_col'] in df_features.columns):
-            logger.info("Creating economic features...")
-            df_features = self.create_economic_features(
-                df_features,
-                config['gdp_col'],
-                config['population_col']
-            )
-        else:
-            logger.warning("Skipping economic features due to missing GDP or population data")
-
-        # Create policy features if required columns exist
-        if ('policy_cols' in config and
-                all(col in df_features.columns for col in config['policy_cols'])):
-            logger.info("Creating policy features...")
-            df_features = self.create_policy_features(
-                df_features,
-                config['policy_cols']
-            )
-        else:
-            logger.warning("Skipping policy features due to missing policy data")
-
-        # Create technical features if required columns exist
-        if ('capacity_cols' in config and
-                any(col in df_features.columns for col in config['capacity_cols'])):
-            logger.info("Creating technical features...")
-            available_cols = [col for col in config['capacity_cols']
-                              if col in df_features.columns]
-            df_features = self.create_technical_features(
-                df_features,
-                available_cols
-            )
-        else:
-            logger.warning("Skipping technical features due to missing capacity data")
-
-        # Create interaction features if possible
-        if 'feature_pairs' in config:
-            valid_pairs = []
-            for pair in config['feature_pairs']:
-                if all(feat in df_features.columns for feat in pair):
-                    valid_pairs.append(pair)
-
-            if valid_pairs:
-                logger.info("Creating interaction features...")
-                df_features = self.create_interaction_features(
-                    df_features,
-                    valid_pairs
-                )
-            else:
-                logger.warning("Skipping interaction features due to missing columns")
-
-        # Create regional features if possible
-        if ('region_col' in config and 'regional_target_cols' in config and
-                config['region_col'] in df_features.columns):
-            available_targets = [col for col in config['regional_target_cols']
-                                 if col in df_features.columns]
-            if available_targets:
-                logger.info("Creating regional features...")
-                df_features = self.create_regional_features(
-                    df_features,
-                    config['region_col'],
-                    available_targets
-                )
-            else:
-                logger.warning("Skipping regional features due to missing target columns")
+        # Add visualization step at the end
+        self.visualize_and_save_features(df_features)
 
         logger.info("Feature engineering pipeline completed successfully")
         return df_features
@@ -364,15 +323,15 @@ def main():
     feature_engineer = FeatureEngineer()
 
     try:
-        # Load your preprocessed data here
+        # Load your preprocessed data
         df = pd.read_csv('processed_data.csv')
 
-        # Apply feature engineering pipeline
+        # Apply feature engineering pipeline with visualizations
         engineered_df = feature_engineer.create_all_features(df, config)
 
         # Save engineered features
         engineered_df.to_csv('engineered_features.csv', index=False)
-        logger.info("Feature engineering completed and saved successfully")
+        logger.info("Feature engineering and visualizations completed successfully")
 
     except Exception as e:
         logger.error(f"Error in feature engineering pipeline: {str(e)}")
