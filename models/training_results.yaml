@@ -1,0 +1,56 @@
+advanced:
+  gradient_boosting:
+    feature_importances:
+      biofuel_generation: 0.0026578322603223814
+      geothermal_generation: 0.09903518613422937
+      hydro_generation: 0.14522139105578338
+      renewable_generation_lag_1: 0.3698322299812012
+      renewable_generation_lag_3: 0.004264674532692724
+      renewable_generation_rolling_mean_3: 0.30022002446047213
+      renewable_generation_rolling_mean_6: 0.0604020926671004
+      renewable_share_pct: 6.11251044885365e-05
+      solar_generation: 0.018278523478651942
+      total_energy_consumption: 1.83472702216375e-05
+      wind_generation: 8.573054836445395e-06
+    mae: 0.008517715233428107
+    mse: 0.00032100359648315854
+    r2: 0.9996532623648531
+    rmse: 0.017916573234945308
+  random_forest:
+    feature_importances:
+      biofuel_generation: 0.07276159045821232
+      geothermal_generation: 0.05863586141235063
+      hydro_generation: 0.12443591259857764
+      renewable_generation_lag_1: 0.29847677721324534
+      renewable_generation_lag_3: 0.015291089000839966
+      renewable_generation_rolling_mean_3: 0.18873617736849008
+      renewable_generation_rolling_mean_6: 0.173977420307451
+      renewable_share_pct: 0.00015075862576144743
+      solar_generation: 0.06747418431814158
+      total_energy_consumption: 2.788423901309773e-05
+      wind_generation: 3.23444579169503e-05
+    mae: 0.009604223663290808
+    mse: 0.0004112385648758172
+    r2: 0.9995557934894548
+    rmse: 0.020279017847909135
+  svr:
+    mae: 0.03793122264140232
+    mse: 0.0021154778028470347
+    r2: 0.9977149297434634
+    rmse: 0.045994323593754854
+baseline:
+  lasso:
+    mae: 0.08243079959473369
+    mse: 0.013779792302315342
+    r2: 0.985115516934805
+    rmse: 0.11738736006195617
+  linear:
+    mae: 0.018591815817676615
+    mse: 0.0006621532541494174
+    r2: 0.99928476361024
+    rmse: 0.02573233868402593
+  ridge:
+    mae: 0.01907056125810129
+    mse: 0.000696133781434689
+    r2: 0.9992480589508498
+    rmse: 0.02638434728081574

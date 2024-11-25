@@ -1,0 +1,45 @@
+
+Detailed Prediction Metrics
+==================================================
+
+BASELINE MODELS
+--------------------
+
+linear:
+  Mean Squared Error: 0.0007
+  Root Mean Squared Error: 0.0257
+  Mean Absolute Error: 0.0186
+  R² Score: 0.9993
+
+ridge:
+  Mean Squared Error: 0.0007
+  Root Mean Squared Error: 0.0264
+  Mean Absolute Error: 0.0191
+  R² Score: 0.9992
+
+lasso:
+  Mean Squared Error: 0.0138
+  Root Mean Squared Error: 0.1174
+  Mean Absolute Error: 0.0824
+  R² Score: 0.9851
+
+ADVANCED MODELS
+--------------------
+
+random_forest:
+  Mean Squared Error: 0.0004
+  Root Mean Squared Error: 0.0203
+  Mean Absolute Error: 0.0096
+  R² Score: 0.9996
+
+gradient_boosting:
+  Mean Squared Error: 0.0003
+  Root Mean Squared Error: 0.0179
+  Mean Absolute Error: 0.0085
+  R² Score: 0.9997
+
+svr:
+  Mean Squared Error: 0.0021
+  Root Mean Squared Error: 0.0460
+  Mean Absolute Error: 0.0379
+  R² Score: 0.9977

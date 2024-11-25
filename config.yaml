@@ -1,32 +1,74 @@
 data_paths:
   base_dir: data
+  processed_dir: processed_data
   output_dir: processed_data
+
+model_paths:
+  output_dir: models
+
+baseline_models:
+  ridge_alpha: 1.0
+  lasso_alpha: 0.1
+  arima_order: [ 1, 1, 1 ]
+
+
+advanced_models:
+  rf_n_estimators: 200
+  rf_max_depth: null
+  gb_n_estimators: 100
+  gb_learning_rate: 0.1
+  svr_C: 1.0
+  svr_kernel: rbf
+
+training:
+  target_column: renewable_generation
+  feature_columns:
+    - hydro_generation
+    - biofuel_generation
+    - solar_generation
+    - geothermal_generation
+    - total_energy_consumption
+    - renewable_share_pct
+    - wind_generation
+    - renewable_generation_lag_1
+    - renewable_generation_lag_3
+    - renewable_generation_rolling_mean_3
+    - renewable_generation_rolling_mean_6
+  time_column: year
+  test_size: 0.2
+  random_state: 42
+  scale_features: true
+  tune_hyperparameters: true
+  train_arima: true
+
 data_validation:
   max_date: '2022-12-31'
   min_date: '1965-01-01'
   min_rows: 1000
   required_columns:
-  - country
-  - year
-  - renewable_generation
-  - total_energy_consumption
+    - country
+    - year
+    - renewable_generation
+    - total_energy_consumption
+
 feature_engineering:
   create_weather_features: true
   renewable_cols:
-  - hydro_generation
-  - solar_generation
-  - wind_generation
+    - hydro_generation
+    - solar_generation
+    - wind_generation
   total_energy_col: total_energy_consumption
+
 preprocessing:
   categorical_missing_strategy: mode
   date_column: year
   group_column: country
   handle_missing: true
   lag_periods:
-  - 1
-  - 3
-  - 6
-  - 12
+    - 1
+    - 3
+    - 6
+    - 12
   normalization_method: standard
   normalize: true
   numeric_missing_strategy: knn
@@ -34,7 +76,7 @@ preprocessing:
   outlier_threshold: 3.0
   remove_outliers: true
   rolling_windows:
-  - 3
-  - 6
-  - 12
+    - 3
+    - 6
+    - 12
   target_column: renewable_generation

@@ -1,0 +1,45 @@
+Model Evaluation Report
+==================================================
+
+
+ADVANCED MODELS
+--------------------
+
+gradient_boosting:
+  mae: 0.0085
+  mse: 0.0003
+  r2: 0.9997
+  rmse: 0.0179
+
+random_forest:
+  mae: 0.0096
+  mse: 0.0004
+  r2: 0.9996
+  rmse: 0.0203
+
+svr:
+  mae: 0.0379
+  mse: 0.0021
+  r2: 0.9977
+  rmse: 0.0460
+
+BASELINE MODELS
+--------------------
+
+lasso:
+  mae: 0.0824
+  mse: 0.0138
+  r2: 0.9851
+  rmse: 0.1174
+
+linear:
+  mae: 0.0186
+  mse: 0.0007
+  r2: 0.9993
+  rmse: 0.0257
+
+ridge:
+  mae: 0.0191
+  mse: 0.0007
+  r2: 0.9992
+  rmse: 0.0264
