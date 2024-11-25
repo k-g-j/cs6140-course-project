@@ -10,6 +10,7 @@ baseline_models:
   ridge_alpha: 1.0
   lasso_alpha: 0.1
   arima_order: [ 1, 1, 1 ]
+  seasonality: false
 
 
 advanced_models:

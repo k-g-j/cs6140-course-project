@@ -45,8 +45,7 @@ class BaselineModels:
 
         return self.models
 
-    def train_arima(self, timeseries: pd.Series,
-                    order: Tuple[int, int, int] = (1, 1, 1)) -> Dict:
+    def train_arima(self, timeseries: pd.Series, order: Tuple[int, int, int] = (1, 1, 1)) -> Dict:
         """
         Train ARIMA model for time series prediction.
 
@@ -60,10 +59,25 @@ class BaselineModels:
         logger.info(f"Training ARIMA model with order {order}...")
 
         try:
-            model = ARIMA(timeseries, order=order)
+            # Handle NaN values
+            timeseries = timeseries.ffill().bfill()  # Using newer pandas methods
+
+            # Store order for later use
+            self._arima_order = order
+
+            # Train model with optimized parameters
+            model = ARIMA(
+                timeseries,
+                order=order,
+                enforce_stationarity=False,
+                enforce_invertibility=False
+            )
             fitted_model = model.fit()
+
+            # Store model
             self.models['arima'] = fitted_model
             logger.info("Successfully trained ARIMA model")
+
             return {'arima': fitted_model}
 
         except Exception as e:
@@ -97,9 +111,63 @@ class BaselineModels:
         # Evaluate ARIMA model if available
         if 'arima' in self.models:
             try:
-                # Get predictions for the test period
+                # Get predictions for test period
                 arima_model = self.models['arima']
                 forecast = arima_model.forecast(steps=len(y_test))
+
+                # Handle differencing if needed
+                if hasattr(self, '_arima_order') and self._arima_order[1] > 0:
+                    forecast = forecast.cumsum() + y_test.iloc[0]
+
+                metrics['arima'] = {
+                    'mse': mean_squared_error(y_test, forecast),
+                    'rmse': np.sqrt(mean_squared_error(y_test, forecast)),
+                    'mae': mean_absolute_error(y_test, forecast),
+                    'r2': r2_score(y_test, forecast)
+                }
+                logger.info("Successfully evaluated ARIMA model")
+            except Exception as e:
+                logger.warning(f"Could not evaluate ARIMA model: {str(e)}")
+
+        self.metrics = metrics
+        return metrics
+
+    def evaluate_models(self, X_test: pd.DataFrame, y_test: pd.Series) -> Dict:
+        """
+        Evaluate trained models using multiple metrics.
+
+        Args:
+            X_test: Test features
+            y_test: Test target values
+
+        Returns:
+            Dictionary of evaluation metrics for each model
+        """
+        metrics = {}
+
+        # Evaluate linear models
+        for name, model in self.models.items():
+            if name != 'arima':
+                y_pred = model.predict(X_test)
+                metrics[name] = {
+                    'mse': mean_squared_error(y_test, y_pred),
+                    'rmse': np.sqrt(mean_squared_error(y_test, y_pred)),
+                    'mae': mean_absolute_error(y_test, y_pred),
+                    'r2': r2_score(y_test, y_pred)
+                }
+
+        # Evaluate ARIMA model if available
+        if 'arima' in self.models:
+            try:
+                # Get predictions for test period
+                arima_model = self.models['arima']
+
+                # Create proper forecast index
+                forecast = arima_model.forecast(steps=len(y_test))
+
+                # If differencing was applied, cumsum to get original scale
+                if arima_model.order[1] > 0:  # If d > 0
+                    forecast = forecast.cumsum() + y_test.iloc[0]
 
                 metrics['arima'] = {
                     'mse': mean_squared_error(y_test, forecast),
