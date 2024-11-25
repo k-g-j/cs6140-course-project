@@ -1,43 +1,25 @@
 advanced:
   gradient_boosting:
     feature_importances:
-      biofuel_generation: 0.02831372742503277
-      geothermal_generation: 0.09858768018921338
-      hydro_generation: 0.13451305773791963
-      renewable_generation_lag_1: 0.3696611716357374
-      renewable_generation_lag_3: 0.004067279896809593
-      renewable_generation_rolling_mean_3: 0.3004293890884809
-      renewable_generation_rolling_mean_6: 0.051429916413034675
-      renewable_share_pct: 6.250407117699553e-05
-      solar_generation: 0.01290946142247423
-      total_energy_consumption: 1.7384901252768522e-05
-      wind_generation: 8.427218867581354e-06
-    mae: 0.008454836933138131
-    mse: 0.00030477795832913133
-    r2: 0.9996707887709866
-    rmse: 0.017457891004618264
+      renewable_share_pct: 0.46817634463618235
+      total_energy_consumption: 0.5318236553638177
+    mae: 0.602000260711786
+    mse: 0.6922448097584307
+    r2: 0.25225969145505855
+    rmse: 0.8320125057704546
   random_forest:
     feature_importances:
-      biofuel_generation: 0.0813261476608102
-      geothermal_generation: 0.06861555167454354
-      hydro_generation: 0.12274773758616697
-      renewable_generation_lag_1: 0.28670504102064964
-      renewable_generation_lag_3: 0.013075447894458192
-      renewable_generation_rolling_mean_3: 0.18705822651355536
-      renewable_generation_rolling_mean_6: 0.17860559243558582
-      renewable_share_pct: 0.00015115972731600155
-      solar_generation: 0.06165480664297127
-      total_energy_consumption: 2.7874334425386554e-05
-      wind_generation: 3.2414509517690055e-05
-    mae: 0.009602144253742418
-    mse: 0.0004112648733578517
-    r2: 0.9995557650718889
-    rmse: 0.02027966650016345
+      renewable_share_pct: 0.4684841415676137
+      total_energy_consumption: 0.5315158584323862
+    mae: 0.5299937038015045
+    mse: 0.5628237750324164
+    r2: 0.3920560800650448
+    rmse: 0.7502158189697258
   svr:
-    mae: 0.03904612481036237
-    mse: 0.002201996409364025
-    r2: 0.9976214751611828
-    rmse: 0.04692543456766304
+    mae: 0.6458373891139841
+    mse: 0.8144650789157651
+    r2: 0.12024133540260573
+    rmse: 0.9024771902468035
 baseline:
   arima:
     mae: 2.6907672229703072
@@ -50,12 +32,12 @@ baseline:
     r2: -0.0006404176641232606
     rmse: 0.9624839100718826
   linear:
-    mae: 0.01858668199191288
-    mse: 0.0006624878316661881
-    r2: 0.9992844022104981
-    rmse: 0.025738838972770083
+    mae: 0.7318575387721619
+    mse: 0.9292404827406447
+    r2: -0.0037353194737734796
+    rmse: 0.9639712043109196
   ridge:
-    mae: 0.01909374910976726
-    mse: 0.0006981574221488845
-    r2: 0.9992458730800268
-    rmse: 0.026422668717388947
+    mae: 0.7318556853773367
+    mse: 0.9292328312347016
+    r2: -0.003727054566136534
+    rmse: 0.9639672355607848
