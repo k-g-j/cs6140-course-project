@@ -1,61 +1,61 @@
 advanced:
   gradient_boosting:
     feature_importances:
-      biofuel_generation: 0.0026578322603223814
-      geothermal_generation: 0.09903518613422937
-      hydro_generation: 0.14522139105578338
-      renewable_generation_lag_1: 0.3698322299812012
-      renewable_generation_lag_3: 0.004264674532692724
-      renewable_generation_rolling_mean_3: 0.30022002446047213
-      renewable_generation_rolling_mean_6: 0.0604020926671004
-      renewable_share_pct: 6.11251044885365e-05
-      solar_generation: 0.018278523478651942
-      total_energy_consumption: 1.83472702216375e-05
-      wind_generation: 8.573054836445395e-06
-    mae: 0.008517715233428107
-    mse: 0.00032100359648315854
-    r2: 0.9996532623648531
-    rmse: 0.017916573234945308
+      biofuel_generation: 0.02831372742503277
+      geothermal_generation: 0.09858768018921338
+      hydro_generation: 0.13451305773791963
+      renewable_generation_lag_1: 0.3696611716357374
+      renewable_generation_lag_3: 0.004067279896809593
+      renewable_generation_rolling_mean_3: 0.3004293890884809
+      renewable_generation_rolling_mean_6: 0.051429916413034675
+      renewable_share_pct: 6.250407117699553e-05
+      solar_generation: 0.01290946142247423
+      total_energy_consumption: 1.7384901252768522e-05
+      wind_generation: 8.427218867581354e-06
+    mae: 0.008454836933138131
+    mse: 0.00030477795832913133
+    r2: 0.9996707887709866
+    rmse: 0.017457891004618264
   random_forest:
     feature_importances:
-      biofuel_generation: 0.07276159045821232
-      geothermal_generation: 0.05863586141235063
-      hydro_generation: 0.12443591259857764
-      renewable_generation_lag_1: 0.29847677721324534
-      renewable_generation_lag_3: 0.015291089000839966
-      renewable_generation_rolling_mean_3: 0.18873617736849008
-      renewable_generation_rolling_mean_6: 0.173977420307451
-      renewable_share_pct: 0.00015075862576144743
-      solar_generation: 0.06747418431814158
-      total_energy_consumption: 2.788423901309773e-05
-      wind_generation: 3.23444579169503e-05
-    mae: 0.009604223663290808
-    mse: 0.0004112385648758172
-    r2: 0.9995557934894548
-    rmse: 0.020279017847909135
+      biofuel_generation: 0.0813261476608102
+      geothermal_generation: 0.06861555167454354
+      hydro_generation: 0.12274773758616697
+      renewable_generation_lag_1: 0.28670504102064964
+      renewable_generation_lag_3: 0.013075447894458192
+      renewable_generation_rolling_mean_3: 0.18705822651355536
+      renewable_generation_rolling_mean_6: 0.17860559243558582
+      renewable_share_pct: 0.00015115972731600155
+      solar_generation: 0.06165480664297127
+      total_energy_consumption: 2.7874334425386554e-05
+      wind_generation: 3.2414509517690055e-05
+    mae: 0.009602144253742418
+    mse: 0.0004112648733578517
+    r2: 0.9995557650718889
+    rmse: 0.02027966650016345
   svr:
-    mae: 0.03793122264140232
-    mse: 0.0021154778028470347
-    r2: 0.9977149297434634
-    rmse: 0.045994323593754854
+    mae: 0.03904612481036237
+    mse: 0.002201996409364025
+    r2: 0.9976214751611828
+    rmse: 0.04692543456766304
 baseline:
   arima:
-    mae: 174.31459112406972
-    mse: 40419.14031312418
-    r2: -43658.43958381362
-    rmse: 201.04512009278957
+    mae: 2.6907672229703072
+    mse: 8.122226523187976
+    r2: -7.773364683860699
+    rmse: 2.8499520212080722
   lasso:
-    mae: 0.08243079959473369
-    mse: 0.013779792302315342
-    r2: 0.985115516934805
-    rmse: 0.11738736006195617
+    mae: 0.7311093266383387
+    mse: 0.9263752771472598
+    r2: -0.0006404176641232606
+    rmse: 0.9624839100718826
   linear:
-    mae: 0.018591815817676615
-    mse: 0.0006621532541494174
-    r2: 0.99928476361024
-    rmse: 0.02573233868402593
+    mae: 0.01858668199191288
+    mse: 0.0006624878316661881
+    r2: 0.9992844022104981
+    rmse: 0.025738838972770083
   ridge:
-    mae: 0.01907056125810129
-    mse: 0.000696133781434689
-    r2: 0.9992480589508498
-    rmse: 0.02638434728081574
+    mae: 0.01909374910976726
+    mse: 0.0006981574221488845
+    r2: 0.9992458730800268
+    rmse: 0.026422668717388947

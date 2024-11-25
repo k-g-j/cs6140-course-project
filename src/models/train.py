@@ -1,26 +1,16 @@
+"""Main training script for renewable energy prediction models."""
 import logging
-import sys
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict
 
 import numpy as np
 import pandas as pd
 import yaml
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 from src.models.advanced_models import AdvancedModels
 from src.models.baseline_models import BaselineModels
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('training.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
 logger = logging.getLogger(__name__)
 
 
@@ -28,202 +18,96 @@ class ModelTrainer:
     """Class to handle model training and evaluation pipeline."""
 
     def __init__(self, config_path: str):
-        """
-        Initialize ModelTrainer with configuration.
-
-        Args:
-            config_path: Path to configuration file
-        """
+        """Initialize ModelTrainer with configuration."""
+        logger.info(f"Loading configuration from {config_path}")
         self.config = self._load_config(config_path)
-        self.data_dir = Path(self.config['data_paths']['processed_dir'])
-        self.models_dir = Path(self.config['model_paths']['output_dir'])
 
-        # Create models directory if it doesn't exist
+        # Get data directory, trying both processed_dir and output_dir
+        data_paths = self.config.get('data_paths', {})
+        if 'processed_dir' in data_paths:
+            self.data_dir = Path(data_paths['processed_dir'])
+        elif 'output_dir' in data_paths:
+            self.data_dir = Path(data_paths['output_dir'])
+        else:
+            # Default to 'processed_data' if neither is specified
+            self.data_dir = Path('processed_data')
+            logger.warning("No data directory specified in config, using default: processed_data")
+
+        # Get models directory
+        model_paths = self.config.get('model_paths', {})
+        self.models_dir = Path(model_paths.get('output_dir', 'models'))
+
+        # Create directories if they don't exist
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
+        logger.info(f"Using data directory: {self.data_dir}")
+        logger.info(f"Using models directory: {self.models_dir}")
+
+        # Initialize models
         self.baseline_models = BaselineModels(self.config.get('baseline_models', {}))
         self.advanced_models = AdvancedModels(self.config.get('advanced_models', {}))
 
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file."""
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        return config
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            if config is None:
+                raise ValueError("Empty configuration file")
+            return config
+        except Exception as e:
+            logger.error(f"Error loading configuration from {config_path}: {str(e)}")
+            raise
 
-    def load_data(self) -> pd.DataFrame:
+    def prepare_time_series(self, X: pd.DataFrame, y: pd.Series) -> pd.Series:
         """
-        Load processed data for training.
-
-        Returns:
-            Processed DataFrame
-        """
-        data_path = self.data_dir / 'final_processed_data.csv'
-        logger.info(f"Loading data from {data_path}")
-
-        df = pd.read_csv(data_path)
-        logger.info(f"Loaded data with shape: {df.shape}")
-        return df
-
-    def prepare_data(self, df: pd.DataFrame) -> Tuple[
-        pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-        """
-        Prepare data for training by splitting features and target.
+        Prepare time series data for ARIMA model.
 
         Args:
-            df: Input DataFrame
+            X: DataFrame containing features including time column
+            y: Target variable series
 
         Returns:
-            Training and testing splits (X_train, X_test, y_train, y_test)
+            pd.Series: Time series data resampled to yearly frequency
         """
+        time_col = self.config['training'].get('time_column', 'year')
+
+        if time_col not in X.columns:
+            raise ValueError(f"Time column '{time_col}' not found in data")
+
         try:
-            # Get target and feature columns from config
-            target_col = self.config['training']['target_column']
-            feature_cols = self.config['training']['feature_columns']
-            time_col = self.config['training'].get('time_column', 'year')
+            # First normalize the years to a proper range
+            years = X[time_col].values
+            min_year = int(min(years))
 
-            logger.info(f"Target column: {target_col}")
-            logger.info(f"Feature columns: {feature_cols}")
-            logger.info(f"Time column: {time_col}")
+            # Map years to a sequence starting from 2000 (arbitrary base year)
+            year_mapping = {year: 2000 + idx for idx, year in enumerate(sorted(set(years)))}
+            normalized_years = pd.Series(years).map(year_mapping)
 
-            # Verify columns exist in dataframe
-            missing_cols = [col for col in feature_cols + [target_col, time_col] if
-                            col not in df.columns]
-            if missing_cols:
-                raise ValueError(f"Missing columns in dataset: {missing_cols}")
+            # Create datetime index from normalized years
+            dates = pd.to_datetime(normalized_years.astype(int).astype(str), format='%Y')
 
-            # Split features and target
-            X = df[feature_cols + [time_col]].copy()  # Include time column
-            y = df[target_col].copy()
+            # Create time series with datetime index
+            ts_data = pd.Series(y.values, index=dates)
 
-            # Display initial data info
-            logger.info(f"Initial shapes - X: {X.shape}, y: {y.shape}")
-            logger.info(f"Data types:\n{X.dtypes}")
+            # Sort index and resample to yearly frequency
+            # Using 'YE' (Year End) instead of deprecated 'Y'
+            ts_data = ts_data.sort_index()
+            yearly_data = ts_data.resample('YE').mean()
 
-            # Handle missing values
-            logger.info("Handling missing values...")
-
-            # Get column types
-            numeric_cols = X.select_dtypes(include=['float64', 'int64']).columns
-            categorical_cols = X.select_dtypes(exclude=['float64', 'int64']).columns
-
-            # Handle time column first
-            if time_col in numeric_cols:
-                logger.info(f"Processing time column: {time_col}")
-                try:
-                    # Create proper year values and ensure they're numeric
-                    years = pd.to_numeric(df[time_col], errors='coerce')
-                    years = years.fillna(years.median())  # Fill any NaN values with median
-                    unique_years = sorted(years.unique())
-
-                    logger.info(f"Original year range: {min(unique_years)} to {max(unique_years)}")
-
-                    # Create mapping from year to index
-                    year_mapping = {year: idx for idx, year in enumerate(unique_years)}
-
-                    # Map the year values
-                    X[time_col] = X[time_col].map(year_mapping).fillna(
-                        0)  # Use 0 for any unmapped values
-
-                    logger.info(f"Processed year range: {X[time_col].min()} to {X[time_col].max()}")
-
-                except Exception as e:
-                    logger.error(f"Error processing time column: {str(e)}")
-                    raise
-
-            # Handle missing values in other numeric columns
-            for col in numeric_cols:
-                if col != time_col:
-                    missing = X[col].isna().sum()
-                    if missing > 0:
-                        logger.info(f"Filling {missing} missing values in {col}")
-                        X[col] = X[col].fillna(X[col].median())
-
-            # Handle missing values in categorical columns
-            for col in categorical_cols:
-                missing = X[col].isna().sum()
-                if missing > 0:
-                    logger.info(f"Filling {missing} missing values in {col}")
-                    mode_value = X[col].mode()[0] if not X[col].mode().empty else 'Unknown'
-                    X[col] = X[col].fillna(mode_value)
-
-            # Remove any rows where target is NaN
-            initial_rows = len(y)
-            valid_mask = ~y.isna()
-            X = X[valid_mask]
-            y = y[valid_mask]
-            dropped_rows = initial_rows - len(y)
-            if dropped_rows > 0:
-                logger.warning(f"Dropped {dropped_rows} rows with missing target values")
-
-            logger.info(f"After handling missing values - X shape: {X.shape}")
-
-            # Split into train and test sets
-            test_size = self.config['training'].get('test_size', 0.2)
-            random_state = self.config['training'].get('random_state', 42)
-
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size, random_state=random_state,
-                stratify=None  # Add stratification if needed
-            )
-
-            # Scale features if specified
-            if self.config['training'].get('scale_features', True):
-                logger.info("Scaling features...")
-                scaler = StandardScaler()
-
-                # Exclude time column from scaling
-                features_to_scale = [col for col in X_train.columns if col != time_col]
-                logger.info(f"Scaling columns: {features_to_scale}")
-
-                # Scale features
-                X_train_scaled = pd.DataFrame(
-                    scaler.fit_transform(X_train[features_to_scale]),
-                    columns=features_to_scale,
-                    index=X_train.index
-                )
-                X_test_scaled = pd.DataFrame(
-                    scaler.transform(X_test[features_to_scale]),
-                    columns=features_to_scale,
-                    index=X_test.index
-                )
-
-                # Add back the time column
-                X_train_scaled[time_col] = X_train[time_col]
-                X_test_scaled[time_col] = X_test[time_col]
-
-                X_train = X_train_scaled
-                X_test = X_test_scaled
-
-                logger.info("Feature scaling completed")
-
-            logger.info(f"Final shapes - Training: {X_train.shape}, Testing: {X_test.shape}")
-
-            # Verify data quality
-            assert not X_train.isna().any().any(), "Missing values found in X_train"
-            assert not X_test.isna().any().any(), "Missing values found in X_test"
-            assert not y_train.isna().any(), "Missing values found in y_train"
-            assert not y_test.isna().any(), "Missing values found in y_test"
-
-            logger.info("Data preparation completed successfully")
-            return X_train, X_test, y_train, y_test
+            logger.info(
+                f"Created time series with {len(yearly_data)} points from {yearly_data.index.min().year} to {yearly_data.index.max().year}")
+            return yearly_data
 
         except Exception as e:
-            logger.error(f"Error in prepare_data: {str(e)}")
+            logger.error(f"Error preparing time series data: {str(e)}")
             raise
 
     def train_models(self, X_train: pd.DataFrame, X_test: pd.DataFrame,
                      y_train: pd.Series, y_test: pd.Series) -> Dict:
         """
         Train all models and evaluate their performance.
-
-        Args:
-            X_train: Training features
-            X_test: Testing features
-            y_train: Training target values
-            y_test: Testing target values
-
-        Returns:
-            Dictionary containing evaluation metrics for all models
         """
         try:
             metrics = {}
@@ -233,7 +117,7 @@ class ModelTrainer:
             time_col = self.config['training'].get('time_column', 'year')
             feature_cols = [col for col in X_train.columns if col != time_col]
 
-            # Train linear models using only feature columns
+            # Train linear models
             logger.info("Training linear models...")
             self.baseline_models.train_linear_models(X_train[feature_cols], y_train)
 
@@ -241,37 +125,18 @@ class ModelTrainer:
             if self.config['training'].get('train_arima', True):
                 try:
                     logger.info("Training ARIMA model...")
-                    # Create time series from training data
-                    time_series = pd.DataFrame({
-                        'year': pd.to_numeric(X_train[time_col]),
-                        'value': y_train
-                    }).sort_values('year')
 
-                    # Get unique years and values
-                    yearly_data = time_series.groupby('year')['value'].mean().reset_index()
+                    # Prepare time series data
+                    yearly_data = self.prepare_time_series(X_train, y_train)
+                    n_points = len(yearly_data)
+                    logger.info(f"Training ARIMA on {n_points} time points")
 
-                    # Create proper datetime index
-                    time_index = pd.date_range(
-                        start=f"{2000}-01-01",
-                        periods=len(yearly_data),
-                        freq='YE'
-                    )
-
-                    # Create time series with proper datetime index
-                    time_series_data = pd.Series(
-                        data=yearly_data['value'].values,
-                        index=time_index,
-                        name='value'
-                    )
-
-                    # Train ARIMA model
-                    logger.info(
-                        f"Training ARIMA on {len(time_series_data)} time points from {time_series_data.index.min().year} to {time_series_data.index.max().year}")
+                    # Get ARIMA order from config and train
                     arima_order = tuple(
                         self.config['baseline_models'].get('arima_order', [1, 1, 1]))
                     logger.info(f"Using ARIMA order {arima_order}")
 
-                    self.baseline_models.train_arima(time_series_data, order=arima_order)
+                    self.baseline_models.train_arima(yearly_data, order=arima_order)
                     logger.info("Successfully trained ARIMA model")
 
                 except Exception as e:
@@ -326,40 +191,27 @@ class ModelTrainer:
             logger.error(f"Error in train_models: {str(e)}")
             raise
 
-    def _log_best_models(self, metrics: Dict) -> None:
-        """
-        Log the best performing models based on R2 score.
+    def _log_best_models(self, metrics: Dict):
+        """Log the best performing models based on R2 score."""
+        # Combine all model metrics
+        all_models = {}
+        for model_type in metrics:
+            for model_name, model_metrics in metrics[model_type].items():
+                if 'r2' in model_metrics:
+                    all_models[f"{model_type}_{model_name}"] = model_metrics['r2']
 
-        Args:
-            metrics: Dictionary of model metrics
-        """
-        try:
-            # Combine all model metrics
-            all_models = {}
-            for model_type in metrics:
-                for model_name, model_metrics in metrics[model_type].items():
-                    if 'r2' in model_metrics:
-                        all_models[f"{model_type}_{model_name}"] = model_metrics['r2']
+        # Sort models by R2 score
+        sorted_models = sorted(all_models.items(), key=lambda x: x[1], reverse=True)
 
-            # Sort models by R2 score
-            sorted_models = sorted(all_models.items(), key=lambda x: x[1], reverse=True)
+        # Log results
+        logger.info("\nModel Performance Summary (R² Score):")
+        logger.info("-" * 40)
+        for model_name, r2_score in sorted_models:
+            logger.info(f"{model_name:30s}: {r2_score:.4f}")
+        logger.info("-" * 40)
 
-            logger.info("\nModel Performance Summary (R² Score):")
-            logger.info("-" * 40)
-            for model_name, r2_score in sorted_models:
-                logger.info(f"{model_name:30s}: {r2_score:.4f}")
-            logger.info("-" * 40)
-
-        except Exception as e:
-            logger.warning(f"Could not log best models: {str(e)}")
-
-    def save_results(self, metrics: Dict) -> None:
-        """
-        Save training results and metrics.
-
-        Args:
-            metrics: Dictionary of model metrics
-        """
+    def save_results(self, metrics: Dict):
+        """Save training results to YAML file."""
         results_path = self.models_dir / 'training_results.yaml'
         logger.info(f"Saving training results to {results_path}")
 
@@ -381,54 +233,43 @@ class ModelTrainer:
         with open(results_path, 'w') as f:
             yaml.dump(serializable_metrics, f, default_flow_style=False)
 
-    def run_training_pipeline(self) -> None:
-        """Execute the complete training pipeline."""
-        try:
-            logger.info("Starting model training pipeline...")
-
-            # Load and prepare data
-            df = self.load_data()
-            X_train, X_test, y_train, y_test = self.prepare_data(df)
-
-            # Train and evaluate models
-            metrics = self.train_models(X_train, X_test, y_train, y_test)
-
-            # Save results
-            self.save_results(metrics)
-
-            logger.info("Model training pipeline completed successfully!")
-
-        except Exception as e:
-            logger.error(f"Error in training pipeline: {str(e)}")
-            raise
-
 
 def main():
     """Main execution function."""
     try:
         # Load configuration
-        config_path = Path('config.yaml')
-
-        # Initialize and run training pipeline
+        config_path = 'config.yaml'
         trainer = ModelTrainer(str(config_path))
 
-        # Train models and get data splits
-        X_train, X_test, y_train, y_test = trainer.prepare_data(trainer.load_data())
+        # Load data
+        df = pd.read_csv('processed_data/final_processed_data.csv')
+
+        # Get features and target
+        target_col = trainer.config['training']['target_column']
+        feature_cols = trainer.config['training']['feature_columns']
+        time_col = trainer.config['training'].get('time_column', 'year')
+        all_features = feature_cols + [time_col]
+
+        X = df[all_features]
+        y = df[target_col]
+
+        # Split data
+        test_size = trainer.config['training'].get('test_size', 0.2)
+        random_state = trainer.config['training'].get('random_state', 42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+
+        # Train models
         metrics = trainer.train_models(X_train, X_test, y_train, y_test)
 
-        # Save results before evaluation
+        # Save results
         trainer.save_results(metrics)
 
-        # Run evaluation
-        from src.models.evaluate import ModelEvaluator
-        evaluator = ModelEvaluator(str(config_path))
-        evaluator.run_evaluation(X_test, y_test, {
-            'baseline': trainer.baseline_models.models,
-            'advanced': trainer.advanced_models.models
-        })
+        logger.info("Training completed successfully!")
 
     except Exception as e:
-        logger.error(f"Training pipeline failed: {str(e)}")
+        logger.error(f"Training failed: {str(e)}")
         raise
 
 

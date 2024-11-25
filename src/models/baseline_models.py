@@ -46,14 +46,8 @@ class BaselineModels:
         logger.info(f"Training ARIMA model with order {order}...")
 
         try:
-            # Store parameters
-            self._arima_params = {
-                'order': order,
-                'initial_level': timeseries.iloc[0] if len(timeseries) > 0 else 0
-            }
-
             # Handle NaN values
-            timeseries = timeseries.ffill().bfill()
+            timeseries = timeseries.dropna()
 
             # Train model
             model = ARIMA(
@@ -64,10 +58,16 @@ class BaselineModels:
             )
             fitted_model = model.fit()
 
-            # Store model
+            # Store model and parameters
             self.models['arima'] = fitted_model
-            logger.info("Successfully trained ARIMA model")
+            self._arima_params = {
+                'order': order,
+                'training_start': timeseries.index.min(),
+                'training_end': timeseries.index.max(),
+                'initial_level': timeseries.iloc[0] if len(timeseries) > 0 else 0
+            }
 
+            logger.info("Successfully trained ARIMA model")
             return {'arima': fitted_model}
 
         except Exception as e:
@@ -89,20 +89,18 @@ class BaselineModels:
         # Evaluate ARIMA model if available
         if 'arima' in self.models and self._arima_params:
             try:
-                # Get predictions for test period
+                # Create proper datetime index for forecasting
+                forecast_periods = len(y_test)
                 arima_model = self.models['arima']
-                forecast = arima_model.forecast(steps=len(y_test))
 
-                # Handle differencing based on stored parameters
-                if self._arima_params['order'][1] > 0:  # if d > 0
-                    forecast = forecast.cumsum() + self._arima_params['initial_level']
+                # Generate forecasts
+                forecast = arima_model.forecast(steps=forecast_periods)
 
                 metrics['arima'] = self._calculate_metrics(y_test, forecast)
                 logger.info("Successfully evaluated ARIMA model")
             except Exception as e:
                 logger.warning(f"Could not evaluate ARIMA model: {str(e)}")
 
-        self.metrics = metrics
         return metrics
 
     def _calculate_metrics(self, y_true: pd.Series, y_pred: Union[pd.Series, np.ndarray]) -> Dict:
