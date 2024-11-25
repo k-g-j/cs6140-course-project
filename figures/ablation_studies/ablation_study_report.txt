@@ -1,0 +1,38 @@
+Ablation Studies Report
+==================================================
+
+
+1. Feature Importance Analysis
+------------------------------
+
+generation:
+  Impact: 74.77% performance change
+  Features: hydro_generation, biofuel_generation, solar_generation, geothermal_generation, wind_generation, renewable_generation_lag_1, renewable_generation_lag_3, renewable_generation_rolling_mean_3, renewable_generation_rolling_mean_6
+
+temporal:
+  Impact: -0.02% performance change
+  Features: renewable_generation_lag_1, renewable_generation_lag_3, renewable_generation_rolling_mean_3, renewable_generation_rolling_mean_6
+
+economic:
+  Impact: 0.00% performance change
+  Features: total_energy_consumption, renewable_share_pct
+
+weather:
+  Impact: -0.00% performance change
+  Features: solar_generation, wind_generation
+
+2. Model Complexity Analysis
+------------------------------
+
+Best configuration:
+  n_estimators: 50
+  max_depth: 5
+  R² score: 0.9996
+
+3. Data Volume Analysis
+------------------------------
+
+Performance range:
+  Maximum R² (100% data): 0.9998
+  Minimum R² (20% data): 0.9987
+  Performance gain: 0.1%
