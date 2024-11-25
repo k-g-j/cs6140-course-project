@@ -26,6 +26,12 @@ svr:
 BASELINE MODELS
 --------------------
 
+arima:
+  mae: 174.3146
+  mse: 40419.1403
+  r2: -43658.4396
+  rmse: 201.0451
+
 lasso:
   mae: 0.0824
   mse: 0.0138

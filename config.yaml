@@ -81,3 +81,23 @@ preprocessing:
     - 6
     - 12
   target_column: renewable_generation
+
+  deep_learning_models:
+    lstm:
+      sequence_length: 10
+      units: [ 64, 32 ]
+      dropout: 0.2
+      batch_size: 32
+      epochs: 100
+    cnn:
+      sequence_length: 10
+      filters: [ 64, 32 ]
+      kernel_size: 3
+      batch_size: 32
+      epochs: 100
+
+  ensemble_models:
+    voting:
+      weights: null  # Optional weights for models
+    stacking:
+      final_estimator: 'linear_regression'  # Meta-learner type

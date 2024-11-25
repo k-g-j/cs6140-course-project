@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -18,17 +18,11 @@ class BaselineModels:
         self.config = config or {}
         self.models = {}
         self.metrics = {}
+        self._arima_params = {}  # Store ARIMA parameters
 
     def train_linear_models(self, X_train: pd.DataFrame, y_train: pd.Series) -> Dict:
         """
         Train linear regression models (Linear, Ridge, Lasso).
-
-        Args:
-            X_train: Training features
-            y_train: Training target values
-
-        Returns:
-            Dictionary of trained models
         """
         logger.info("Training linear models...")
 
@@ -48,24 +42,20 @@ class BaselineModels:
     def train_arima(self, timeseries: pd.Series, order: Tuple[int, int, int] = (1, 1, 1)) -> Dict:
         """
         Train ARIMA model for time series prediction.
-
-        Args:
-            timeseries: Time series data
-            order: ARIMA order (p,d,q)
-
-        Returns:
-            Dictionary containing trained ARIMA model
         """
         logger.info(f"Training ARIMA model with order {order}...")
 
         try:
+            # Store parameters
+            self._arima_params = {
+                'order': order,
+                'initial_level': timeseries.iloc[0] if len(timeseries) > 0 else 0
+            }
+
             # Handle NaN values
-            timeseries = timeseries.ffill().bfill()  # Using newer pandas methods
+            timeseries = timeseries.ffill().bfill()
 
-            # Store order for later use
-            self._arima_order = order
-
-            # Train model with optimized parameters
+            # Train model
             model = ARIMA(
                 timeseries,
                 order=order,
@@ -86,14 +76,7 @@ class BaselineModels:
 
     def evaluate_models(self, X_test: pd.DataFrame, y_test: pd.Series) -> Dict:
         """
-        Evaluate trained models using multiple metrics.
-
-        Args:
-            X_test: Test features
-            y_test: Test target values
-
-        Returns:
-            Dictionary of evaluation metrics for each model
+        Evaluate all trained models using multiple metrics.
         """
         metrics = {}
 
@@ -101,30 +84,20 @@ class BaselineModels:
         for name, model in self.models.items():
             if name != 'arima':
                 y_pred = model.predict(X_test)
-                metrics[name] = {
-                    'mse': mean_squared_error(y_test, y_pred),
-                    'rmse': np.sqrt(mean_squared_error(y_test, y_pred)),
-                    'mae': mean_absolute_error(y_test, y_pred),
-                    'r2': r2_score(y_test, y_pred)
-                }
+                metrics[name] = self._calculate_metrics(y_test, y_pred)
 
         # Evaluate ARIMA model if available
-        if 'arima' in self.models:
+        if 'arima' in self.models and self._arima_params:
             try:
                 # Get predictions for test period
                 arima_model = self.models['arima']
                 forecast = arima_model.forecast(steps=len(y_test))
 
-                # Handle differencing if needed
-                if hasattr(self, '_arima_order') and self._arima_order[1] > 0:
-                    forecast = forecast.cumsum() + y_test.iloc[0]
+                # Handle differencing based on stored parameters
+                if self._arima_params['order'][1] > 0:  # if d > 0
+                    forecast = forecast.cumsum() + self._arima_params['initial_level']
 
-                metrics['arima'] = {
-                    'mse': mean_squared_error(y_test, forecast),
-                    'rmse': np.sqrt(mean_squared_error(y_test, forecast)),
-                    'mae': mean_absolute_error(y_test, forecast),
-                    'r2': r2_score(y_test, forecast)
-                }
+                metrics['arima'] = self._calculate_metrics(y_test, forecast)
                 logger.info("Successfully evaluated ARIMA model")
             except Exception as e:
                 logger.warning(f"Could not evaluate ARIMA model: {str(e)}")
@@ -132,55 +105,14 @@ class BaselineModels:
         self.metrics = metrics
         return metrics
 
-    def evaluate_models(self, X_test: pd.DataFrame, y_test: pd.Series) -> Dict:
-        """
-        Evaluate trained models using multiple metrics.
-
-        Args:
-            X_test: Test features
-            y_test: Test target values
-
-        Returns:
-            Dictionary of evaluation metrics for each model
-        """
-        metrics = {}
-
-        # Evaluate linear models
-        for name, model in self.models.items():
-            if name != 'arima':
-                y_pred = model.predict(X_test)
-                metrics[name] = {
-                    'mse': mean_squared_error(y_test, y_pred),
-                    'rmse': np.sqrt(mean_squared_error(y_test, y_pred)),
-                    'mae': mean_absolute_error(y_test, y_pred),
-                    'r2': r2_score(y_test, y_pred)
-                }
-
-        # Evaluate ARIMA model if available
-        if 'arima' in self.models:
-            try:
-                # Get predictions for test period
-                arima_model = self.models['arima']
-
-                # Create proper forecast index
-                forecast = arima_model.forecast(steps=len(y_test))
-
-                # If differencing was applied, cumsum to get original scale
-                if arima_model.order[1] > 0:  # If d > 0
-                    forecast = forecast.cumsum() + y_test.iloc[0]
-
-                metrics['arima'] = {
-                    'mse': mean_squared_error(y_test, forecast),
-                    'rmse': np.sqrt(mean_squared_error(y_test, forecast)),
-                    'mae': mean_absolute_error(y_test, forecast),
-                    'r2': r2_score(y_test, forecast)
-                }
-                logger.info("Successfully evaluated ARIMA model")
-            except Exception as e:
-                logger.warning(f"Could not evaluate ARIMA model: {str(e)}")
-
-        self.metrics = metrics
-        return metrics
+    def _calculate_metrics(self, y_true: pd.Series, y_pred: Union[pd.Series, np.ndarray]) -> Dict:
+        """Calculate standard regression metrics."""
+        return {
+            'mse': mean_squared_error(y_true, y_pred),
+            'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
+            'mae': mean_absolute_error(y_true, y_pred),
+            'r2': r2_score(y_true, y_pred)
+        }
 
     def predict(self, X: pd.DataFrame) -> Dict[str, np.ndarray]:
         """
