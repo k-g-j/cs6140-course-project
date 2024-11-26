@@ -6,6 +6,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import yaml
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 
 from src.models.advanced_models import AdvancedModels
@@ -235,7 +236,6 @@ class ModelTrainer:
 
 
 def main():
-    """Main execution function."""
     try:
         # Load configuration
         config_path = 'config.yaml'
@@ -253,6 +253,12 @@ def main():
         X = df[all_features]
         y = df[target_col]
 
+        # Handle missing values before splitting
+        logger.info("Preprocessing data...")
+        imputer = SimpleImputer(strategy='mean')
+        X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
+        y = pd.Series(imputer.fit_transform(y.values.reshape(-1, 1)).ravel(), index=y.index)
+
         # Split data
         test_size = trainer.config['training'].get('test_size', 0.2)
         random_state = trainer.config['training'].get('random_state', 42)
@@ -260,7 +266,11 @@ def main():
             X, y, test_size=test_size, random_state=random_state
         )
 
+        logger.info("Training set shape: {}".format(X_train.shape))
+        logger.info("Test set shape: {}".format(X_test.shape))
+
         # Train models
+        logger.info("Starting model training...")
         metrics = trainer.train_models(X_train, X_test, y_train, y_test)
 
         # Save results

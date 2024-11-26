@@ -9,7 +9,7 @@ gradient_boosting:
   mae: 0.0085
   mse: 0.0003
   r2: 0.9997
-  rmse: 0.0179
+  rmse: 0.0175
 
 random_forest:
   mae: 0.0096
@@ -18,25 +18,25 @@ random_forest:
   rmse: 0.0203
 
 svr:
-  mae: 0.0379
-  mse: 0.0021
+  mae: 0.0386
+  mse: 0.0022
   r2: 0.9977
-  rmse: 0.0460
+  rmse: 0.0464
 
 BASELINE MODELS
 --------------------
 
 arima:
-  mae: 174.3146
-  mse: 40419.1403
-  r2: -43658.4396
-  rmse: 201.0451
+  mae: 2.6908
+  mse: 8.1222
+  r2: -7.7734
+  rmse: 2.8500
 
 lasso:
-  mae: 0.0824
-  mse: 0.0138
-  r2: 0.9851
-  rmse: 0.1174
+  mae: 0.7311
+  mse: 0.9264
+  r2: -0.0006
+  rmse: 0.9625
 
 linear:
   mae: 0.0186
