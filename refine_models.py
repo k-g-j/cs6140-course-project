@@ -2,6 +2,7 @@
 import logging
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 from sklearn.impute import SimpleImputer
@@ -15,6 +16,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def convert_to_serializable(obj):
+    """Convert numpy types to Python native types for YAML serialization."""
+    if isinstance(obj, dict):
+        return {key: convert_to_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
 
 
 class ModelRefiner:
@@ -136,6 +152,9 @@ class ModelRefiner:
             # Preprocess data first
             X_processed, y_processed = self.preprocess_data(X, y)
 
+            # Use the already saved refined config
+            refined_config_path = self.config_path.parent / 'config_refined.yaml'
+
             # Split data
             test_size = self.config['training'].get('test_size', 0.2)
             random_state = self.config['training'].get('random_state', 42)
@@ -147,15 +166,18 @@ class ModelRefiner:
             )
 
             # Initialize trainer with refined config
-            trainer = ModelTrainer(str(self.config_path))
+            trainer = ModelTrainer(str(refined_config_path))
 
             # Train and evaluate models
             metrics = trainer.train_models(X_train, X_test, y_train, y_test)
 
+            # Convert metrics to serializable format
+            serializable_metrics = convert_to_serializable(metrics)
+
             # Save results
             refined_results_path = Path('models/refined_results.yaml')
             with open(refined_results_path, 'w') as f:
-                yaml.dump(metrics, f, default_flow_style=False)
+                yaml.dump(serializable_metrics, f, default_flow_style=False)
 
             logger.info(f"Refined model results saved to {refined_results_path}")
             return metrics

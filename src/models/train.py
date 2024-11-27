@@ -105,72 +105,74 @@ class ModelTrainer:
             logger.error(f"Error preparing time series data: {str(e)}")
             raise
 
-    def train_models(self, X_train: pd.DataFrame, X_test: pd.DataFrame,
-                     y_train: pd.Series, y_test: pd.Series) -> Dict:
-        """
-        Train all models and evaluate their performance.
-        """
+    def train_models(self, X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.Series,
+                     y_test: pd.Series) -> Dict:
+        """Train and evaluate all models."""
         try:
             metrics = {}
+            time_col = self.config['training'].get('time_column', 'year')
+            feature_cols = self.config['training'].get('feature_columns',
+                                                       [col for col in X_train.columns if
+                                                        col != time_col])
 
             # Train baseline models
             logger.info("Training baseline models...")
-            time_col = self.config['training'].get('time_column', 'year')
-            feature_cols = [col for col in X_train.columns if col != time_col]
 
             # Train linear models
             logger.info("Training linear models...")
             self.baseline_models.train_linear_models(X_train[feature_cols], y_train)
+            logger.info("Linear models training complete")
 
-            # ARIMA model training
-            if self.config['training'].get('train_arima', True):
-                try:
-                    logger.info("Training ARIMA model...")
+            # Train ARIMA model
+            logger.info("Training ARIMA model...")
 
-                    # Prepare time series data
-                    yearly_data = self.prepare_time_series(X_train, y_train)
-                    n_points = len(yearly_data)
-                    logger.info(f"Training ARIMA on {n_points} time points")
+            # Create simple integer index
+            index = np.arange(len(y_train))
+            time_series = pd.Series(data=y_train.values, index=index, name='value')
 
-                    # Get ARIMA order from config and train
-                    arima_order = tuple(
-                        self.config['baseline_models'].get('arima_order', [1, 1, 1]))
-                    logger.info(f"Using ARIMA order {arima_order}")
-
-                    self.baseline_models.train_arima(yearly_data, order=arima_order)
-                    logger.info("Successfully trained ARIMA model")
-
-                except Exception as e:
-                    logger.warning(f"Could not train ARIMA model: {str(e)}")
-                    logger.warning("Continuing without ARIMA model...")
+            # Get ARIMA parameters from config
+            arima_order = tuple(
+                self.config.get('baseline_models', {}).get('arima_order', [1, 1, 1]))
+            try:
+                self.baseline_models.train_arima(time_series, order=arima_order)
+                logger.info(f"ARIMA model training complete with order {arima_order}")
+            except Exception as e:
+                logger.error(f"ARIMA training failed: {str(e)}")
 
             # Evaluate baseline models
             logger.info("Evaluating baseline models...")
             baseline_metrics = self.baseline_models.evaluate_models(X_test[feature_cols], y_test)
             metrics['baseline'] = baseline_metrics
+            logger.info("Baseline models evaluation complete")
 
             # Train advanced models
             logger.info("Training advanced models...")
-            tune_hyperparameters = self.config['training'].get('tune_hyperparameters', True)
 
-            # Random Forest
+            # Train Random Forest
             logger.info("Training Random Forest...")
+            tune_hyperparameters = self.config['training'].get('tune_hyperparameters', True)
             self.advanced_models.train_random_forest(
-                X_train[feature_cols], y_train, tune_hyperparameters=tune_hyperparameters
+                X_train[feature_cols],
+                y_train,
+                tune_hyperparameters=tune_hyperparameters
             )
             logger.info("Trained Random Forest model")
 
-            # Gradient Boosting
+            # Train Gradient Boosting
             logger.info("Training Gradient Boosting...")
             self.advanced_models.train_gradient_boosting(
-                X_train[feature_cols], y_train, tune_hyperparameters=tune_hyperparameters
+                X_train[feature_cols],
+                y_train,
+                tune_hyperparameters=tune_hyperparameters
             )
             logger.info("Trained Gradient Boosting model")
 
-            # SVR
+            # Train SVR
             logger.info("Training SVR...")
             self.advanced_models.train_svr(
-                X_train[feature_cols], y_train, tune_hyperparameters=tune_hyperparameters
+                X_train[feature_cols],
+                y_train,
+                tune_hyperparameters=tune_hyperparameters
             )
             logger.info("Trained SVR model")
 
@@ -178,19 +180,63 @@ class ModelTrainer:
             logger.info("Evaluating advanced models...")
             advanced_metrics = self.advanced_models.evaluate_models(X_test[feature_cols], y_test)
             metrics['advanced'] = advanced_metrics
+            logger.info("Advanced models evaluation complete")
 
-            # Log best models based on R2 score
-            self._log_best_models(metrics)
+            # Print model performance summary
+            logger.info("\nModel Performance Summary (R² Score):")
+            logger.info("-" * 40)
 
-            # Save model metrics
+            # Combine all metrics
+            all_models = {}
+
+            # Add baseline metrics
+            for model_name, model_metrics in baseline_metrics.items():
+                if isinstance(model_metrics, dict) and 'r2' in model_metrics:
+                    all_models[f"baseline_{model_name}"] = model_metrics['r2']
+
+            # Add advanced metrics
+            for model_name, model_metrics in advanced_metrics.items():
+                if isinstance(model_metrics, dict) and 'r2' in model_metrics:
+                    all_models[f"advanced_{model_name}"] = model_metrics['r2']
+
+            # Sort by R² score
+            sorted_models = dict(sorted(all_models.items(), key=lambda x: x[1], reverse=True))
+
+            for model, r2 in sorted_models.items():
+                logger.info(f"{model:30s}: {r2:.4f}")
+            logger.info("-" * 40)
+
+            # Save results
             logger.info("Saving training results...")
-            self.save_results(metrics)
+            results_path = self.models_dir / 'training_results.yaml'
+
+            # Convert numpy values to Python native types
+            serializable_metrics = self._convert_to_serializable(metrics)
+
+            with open(results_path, 'w') as f:
+                yaml.dump(serializable_metrics, f, default_flow_style=False)
+
+            logger.info(f"Saving training results to {results_path}")
 
             return metrics
 
         except Exception as e:
             logger.error(f"Error in train_models: {str(e)}")
             raise
+
+    def _convert_to_serializable(self, obj):
+        """Convert numpy types to Python native types for YAML serialization."""
+        if isinstance(obj, dict):
+            return {key: self._convert_to_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_to_serializable(item) for item in obj]
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj
 
     def _log_best_models(self, metrics: Dict):
         """Log the best performing models based on R2 score."""

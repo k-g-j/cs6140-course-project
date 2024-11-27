@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import yaml
 
@@ -14,6 +15,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class SafeLoaderIgnoreUnknown(yaml.SafeLoader):
+    def construct_undefined(self, node):
+        if isinstance(node.value, (int, float, str)):
+            return node.value
+        return None
+
+
 class VisualizationCreator:
     def __init__(self, results_path: Path, refined_results_path: Path = None):
         self.results_path = results_path
@@ -22,48 +30,74 @@ class VisualizationCreator:
         self.output_dir.mkdir(exist_ok=True, parents=True)
 
         # Load results
-        with open(results_path) as f:
-            self.results = yaml.safe_load(f)
+        try:
+            with open(results_path) as f:
+                self.results = yaml.load(f, Loader=SafeLoaderIgnoreUnknown)
+        except Exception as e:
+            logger.error(f"Error loading results: {e}")
+            self.results = {}
 
         self.refined_results = None
         if refined_results_path and refined_results_path.exists():
-            with open(refined_results_path) as f:
-                self.refined_results = yaml.safe_load(f)
+            try:
+                with open(refined_results_path) as f:
+                    self.refined_results = yaml.load(f, Loader=SafeLoaderIgnoreUnknown)
+            except Exception as e:
+                logger.error(f"Error loading refined results: {e}")
+
+    def _convert_value(self, value):
+        """Convert any numpy/non-standard types to Python native types."""
+        if isinstance(value, dict):
+            return {k: self._convert_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self._convert_value(item) for item in value]
+        elif isinstance(value, (np.integer, np.floating)):
+            return float(value)
+        elif isinstance(value, np.ndarray):
+            return value.tolist()
+        return value
 
     def plot_model_comparison(self):
         """Create model performance comparison visualizations."""
-        # Extract metrics
-        models = []
-        r2_scores = []
-        rmse_scores = []
-        mae_scores = []
-        categories = []
+        # Extract and convert metrics
+        data = []
 
         for model_type in ['baseline', 'advanced']:
-            for model_name, metrics in self.results[model_type].items():
-                models.append(model_name)
-                r2_scores.append(metrics.get('r2', 0))
-                rmse_scores.append(metrics.get('rmse', 0))
-                mae_scores.append(metrics.get('mae', 0))
-                categories.append(model_type)
+            if model_type in self.results:
+                for model_name, metrics in self.results[model_type].items():
+                    # Add metrics to data
+                    data.append({
+                        'Model': model_name,
+                        'Category': model_type,
+                        'R²': self._convert_value(metrics.get('r2', 0)),
+                        'RMSE': self._convert_value(metrics.get('rmse', 0)),
+                        'MAE': self._convert_value(metrics.get('mae', 0))
+                    })
+
+        if not data:
+            logger.warning("No model results to plot")
+            return
+
+        # Convert to DataFrame for easier plotting
+        df = pd.DataFrame(data)
 
         # Create performance comparison plot
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))
 
         # R² scores
-        sns.barplot(x=models, y=r2_scores, hue=categories, ax=ax1)
+        sns.barplot(data=df, x='Model', y='R²', hue='Category', ax=ax1)
         ax1.set_title('Model Comparison - R² Score')
-        ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45)
+        plt.setp(ax1.get_xticklabels(), rotation=45, ha='right')
 
         # RMSE scores
-        sns.barplot(x=models, y=rmse_scores, hue=categories, ax=ax2)
+        sns.barplot(data=df, x='Model', y='RMSE', hue='Category', ax=ax2)
         ax2.set_title('Model Comparison - RMSE')
-        ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45)
+        plt.setp(ax2.get_xticklabels(), rotation=45, ha='right')
 
         # MAE scores
-        sns.barplot(x=models, y=mae_scores, hue=categories, ax=ax3)
+        sns.barplot(data=df, x='Model', y='MAE', hue='Category', ax=ax3)
         ax3.set_title('Model Comparison - MAE')
-        ax3.set_xticklabels(ax3.get_xticklabels(), rotation=45)
+        plt.setp(ax3.get_xticklabels(), rotation=45, ha='right')
 
         plt.tight_layout()
         plt.savefig(self.output_dir / 'model_comparison.png', dpi=300, bbox_inches='tight')

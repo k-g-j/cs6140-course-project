@@ -2,6 +2,9 @@
 
 # run.sh - Main script to execute the renewable energy prediction project
 
+# Exit on error
+set -e
+
 # Print header
 echo "========================================="
 echo "Running Renewable Energy Prediction Project"
@@ -14,6 +17,7 @@ mkdir -p processed_data
 mkdir -p models
 mkdir -p figures
 mkdir -p figures/final_analysis
+mkdir -p figures/feature_analysis
 mkdir -p analysis_results
 mkdir -p logs
 
@@ -29,37 +33,63 @@ if [ ! -f "requirements.txt" ]; then
     exit 1
 fi
 
+# Function to check last command's status
+check_status() {
+    if [ $? -ne 0 ]; then
+        echo "Error: $1 failed"
+        exit 1
+    fi
+}
+
 # Install dependencies if needed
-echo "Installing/updating dependencies..."
+echo -e "\nInstalling/updating dependencies..."
 pip install -r requirements.txt
+check_status "Dependencies installation"
 
-# Run data processing pipeline
-echo -e "\nStep 1: Running data processing pipeline..."
-python3 src/main.py
+# Run data preprocessing pipeline
+echo -e "\nStep 1: Running data preprocessing pipeline..."
+python3 main.py
+check_status "Data preprocessing"
 
-# Run model training
-echo -e "\nStep 2: Running model training..."
-python3 src/models/train.py
+# Run feature engineering
+echo -e "\nStep 2: Running feature engineering..."
+python3 src/data/feature_engineering.py
+check_status "Feature engineering"
+
+# Run initial model training
+echo -e "\nStep 3: Running initial model training..."
+python3 run.py
+check_status "Initial model training"
 
 # Run model evaluation
-echo -e "\nStep 3: Running model evaluation..."
+echo -e "\nStep 4: Running model evaluation..."
 python3 src/models/evaluate.py
+check_status "Model evaluation"
 
 # Run ablation studies
-echo -e "\nStep 4: Running ablation studies..."
+echo -e "\nStep 5: Running ablation studies..."
 python3 run_ablation.py
+check_status "Ablation studies"
 
 # Run results analysis
-echo -e "\nStep 5: Running results analysis..."
+echo -e "\nStep 6: Running results analysis..."
 python3 analyze_results.py
+check_status "Results analysis"
 
 # Run model refinement
-echo -e "\nStep 6: Running model refinement..."
+echo -e "\nStep 7: Running model refinement..."
 python3 refine_models.py
+check_status "Model refinement"
 
 # Create final visualizations
-echo -e "\nStep 7: Creating final visualizations..."
+echo -e "\nStep 8: Creating final visualizations..."
 python3 create_visualizations.py
+check_status "Visualization creation"
+
+# Generate final report
+echo -e "\nStep 9: Generating final report..."
+python3 analyze_results.py
+check_status "Report generation"
 
 # Check for errors in log files
 echo -e "\nChecking logs for errors..."
@@ -79,8 +109,19 @@ echo "- Model outputs: ./models/"
 echo "- Figures: ./figures/"
 echo "- Analysis results: ./analysis_results/"
 echo "- Final visualizations: ./figures/final_analysis/"
+echo "- Feature analysis: ./figures/feature_analysis/"
 echo "- Logs: ./logs/"
 echo "========================================="
 
-# Optional: Generate timestamp for records
+# Record execution timestamp
 echo "Completed at: $(date)" >> logs/execution_history.log
+
+# Final status check
+echo -e "\nChecking final status..."
+if [ -f "models/training_results.yaml" ] && \
+   [ -f "figures/final_analysis/model_comparison.png" ] && \
+   [ -f "analysis_results/analysis_report.md" ]; then
+    echo "All critical outputs generated successfully!"
+else
+    echo "WARNING: Some expected outputs are missing. Please check the logs."
+fi

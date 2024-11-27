@@ -7,9 +7,9 @@ advanced_models:
   rf_n_estimators: 300
 baseline_models:
   arima_order:
-  - 1
-  - 1
-  - 1
+    - 1
+    - 1
+    - 1
 data_paths:
   base_dir: data
   output_dir: processed_data
@@ -19,16 +19,16 @@ data_validation:
   min_date: '1965-01-01'
   min_rows: 1000
   required_columns:
-  - country
-  - year
-  - renewable_generation
-  - total_energy_consumption
+    - country
+    - year
+    - renewable_generation
+    - total_energy_consumption
 feature_engineering:
   create_weather_features: true
   renewable_cols:
-  - hydro_generation
-  - solar_generation
-  - wind_generation
+    - hydro_generation
+    - solar_generation
+    - wind_generation
   total_energy_col: total_energy_consumption
 model_paths:
   output_dir: models
@@ -38,10 +38,10 @@ preprocessing:
   group_column: country
   handle_missing: true
   lag_periods:
-  - 1
-  - 3
-  - 6
-  - 12
+    - 1
+    - 3
+    - 6
+    - 12
   normalization_method: standard
   normalize: true
   numeric_missing_strategy: knn
@@ -49,20 +49,20 @@ preprocessing:
   outlier_threshold: 3.0
   remove_outliers: true
   rolling_windows:
-  - 3
-  - 6
-  - 12
+    - 3
+    - 6
+    - 12
   target_column: renewable_generation
 training:
   feature_columns:
-  - renewable_generation_rolling_mean_3
-  - renewable_generation_lag_1
-  - renewable_generation_rolling_mean_6
-  - renewable_generation_rolling_mean_12
-  - renewable_generation_lag_3
-  - hydro_generation
-  - biofuel_generation
-  - solar_generation
+    - renewable_generation_rolling_mean_3
+    - renewable_generation_lag_1
+    - renewable_generation_rolling_mean_6
+    - renewable_generation_rolling_mean_12
+    - renewable_generation_lag_3
+    - hydro_generation
+    - biofuel_generation
+    - solar_generation
   random_state: 42
   target_column: renewable_generation
   test_size: 0.2

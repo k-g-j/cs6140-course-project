@@ -1,5 +1,6 @@
+"""Implementation of baseline models for renewable energy prediction."""
 import logging
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,7 +19,7 @@ class BaselineModels:
         self.config = config or {}
         self.models = {}
         self.metrics = {}
-        self._arima_params = {}  # Store ARIMA parameters
+        self._arima_params = {}
 
     def train_linear_models(self, X_train: pd.DataFrame, y_train: pd.Series) -> Dict:
         """
@@ -46,8 +47,8 @@ class BaselineModels:
         logger.info(f"Training ARIMA model with order {order}...")
 
         try:
-            # Handle NaN values
-            timeseries = timeseries.dropna()
+            # Ensure time series is properly sorted
+            timeseries = timeseries.sort_index()
 
             # Train model
             model = ARIMA(
@@ -87,46 +88,89 @@ class BaselineModels:
                 metrics[name] = self._calculate_metrics(y_test, y_pred)
 
         # Evaluate ARIMA model if available
-        if 'arima' in self.models and self._arima_params:
+        if 'arima' in self.models:
             try:
-                # Create proper datetime index for forecasting
-                forecast_periods = len(y_test)
-                arima_model = self.models['arima']
+                # Generate forecast for test period
+                forecast = self.models['arima'].forecast(steps=len(y_test))
 
-                # Generate forecasts
-                forecast = arima_model.forecast(steps=forecast_periods)
+                # Convert to numpy array and handle NaNs
+                forecast_array = np.array(forecast)
+                test_array = np.array(y_test)
 
-                metrics['arima'] = self._calculate_metrics(y_test, forecast)
-                logger.info("Successfully evaluated ARIMA model")
+                # Check for and handle NaN values
+                mask = ~np.isnan(forecast_array) & ~np.isnan(test_array)
+                if np.any(mask):
+                    metrics['arima'] = self._calculate_metrics(
+                        test_array[mask],
+                        forecast_array[mask]
+                    )
+                else:
+                    logger.warning("No valid (non-NaN) predictions from ARIMA model")
+                    metrics['arima'] = {
+                        'mse': np.inf,
+                        'rmse': np.inf,
+                        'mae': np.inf,
+                        'r2': -np.inf
+                    }
+                logger.info("ARIMA evaluation complete")
+
             except Exception as e:
-                logger.warning(f"Could not evaluate ARIMA model: {str(e)}")
+                logger.error(f"Error evaluating ARIMA model: {str(e)}")
+                metrics['arima'] = {
+                    'mse': np.inf,
+                    'rmse': np.inf,
+                    'mae': np.inf,
+                    'r2': -np.inf
+                }
 
         return metrics
 
-    def _calculate_metrics(self, y_true: pd.Series, y_pred: Union[pd.Series, np.ndarray]) -> Dict:
-        """Calculate standard regression metrics."""
-        return {
-            'mse': mean_squared_error(y_true, y_pred),
-            'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
-            'mae': mean_absolute_error(y_true, y_pred),
-            'r2': r2_score(y_true, y_pred)
-        }
+    def _calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict:
+        """Calculate regression metrics."""
+        try:
+            # Remove any NaN values
+            mask = ~np.isnan(y_pred) & ~np.isnan(y_true)
+            y_true_clean = y_true[mask]
+            y_pred_clean = y_pred[mask]
 
-    def predict(self, X: pd.DataFrame) -> Dict[str, np.ndarray]:
+            if len(y_true_clean) == 0:
+                raise ValueError("No valid predictions after removing NaNs")
+
+            mse = float(mean_squared_error(y_true_clean, y_pred_clean))
+            rmse = float(np.sqrt(mse))
+            mae = float(mean_absolute_error(y_true_clean, y_pred_clean))
+            r2 = float(r2_score(y_true_clean, y_pred_clean))
+
+            return {
+                'mse': mse,
+                'rmse': rmse,
+                'mae': mae,
+                'r2': r2
+            }
+        except Exception as e:
+            logger.error(f"Error calculating metrics: {str(e)}")
+            return {
+                'mse': np.inf,
+                'rmse': np.inf,
+                'mae': np.inf,
+                'r2': -np.inf
+            }
+
+    def predict(self, X: pd.DataFrame) -> Dict:
         """
-        Generate predictions using trained models.
-
-        Args:
-            X: Features for prediction
-
-        Returns:
-            Dictionary of predictions from each model
+        Generate predictions using all trained models.
         """
         predictions = {}
 
+        # Linear model predictions
         for name, model in self.models.items():
             if name != 'arima':
                 predictions[name] = model.predict(X)
+
+        # ARIMA predictions if available
+        if 'arima' in self.models:
+            forecast_steps = len(X)
+            predictions['arima'] = self.models['arima'].forecast(steps=forecast_steps)
 
         return predictions
 
