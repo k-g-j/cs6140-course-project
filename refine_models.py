@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 from src.models.train import ModelTrainer
 
@@ -24,6 +26,10 @@ class ModelRefiner:
         # Load ablation results
         self.ablation_results = self._load_ablation_results()
 
+        # Initialize preprocessors
+        self.imputer = SimpleImputer(strategy='mean')
+        self.scaler = StandardScaler()
+
     def _load_ablation_results(self):
         """Load ablation study results."""
         ablation_path = Path('figures/ablation_studies/ablation_study_report.txt')
@@ -33,6 +39,42 @@ class ModelRefiner:
 
         with open(ablation_path) as f:
             return f.read()
+
+    def preprocess_data(self, X: pd.DataFrame, y: pd.Series) -> tuple:
+        """
+        Preprocess data by handling missing values and scaling features.
+
+        Args:
+            X: Feature DataFrame
+            y: Target Series
+
+        Returns:
+            Tuple of (processed_X, processed_y)
+        """
+        logger.info("Preprocessing data...")
+
+        # Handle missing values in features
+        X_imputed = pd.DataFrame(
+            self.imputer.fit_transform(X),
+            columns=X.columns,
+            index=X.index
+        )
+
+        # Scale features
+        X_scaled = pd.DataFrame(
+            self.scaler.fit_transform(X_imputed),
+            columns=X_imputed.columns,
+            index=X_imputed.index
+        )
+
+        # Handle missing values in target if any
+        if y.isnull().any():
+            y = pd.Series(
+                self.imputer.fit_transform(y.values.reshape(-1, 1)).ravel(),
+                index=y.index
+            )
+
+        return X_scaled, y
 
     def refine_hyperparameters(self):
         """Refine model hyperparameters based on ablation results."""
@@ -90,27 +132,37 @@ class ModelRefiner:
 
     def retrain_models(self, X: pd.DataFrame, y: pd.Series):
         """Retrain models with refined configuration."""
-        # Split data
-        test_size = self.config['training'].get('test_size', 0.2)
-        random_state = self.config['training'].get('random_state', 42)
+        try:
+            # Preprocess data first
+            X_processed, y_processed = self.preprocess_data(X, y)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=random_state
-        )
+            # Split data
+            test_size = self.config['training'].get('test_size', 0.2)
+            random_state = self.config['training'].get('random_state', 42)
 
-        # Initialize trainer with refined config
-        trainer = ModelTrainer(str(self.config_path))
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_processed, y_processed,
+                test_size=test_size,
+                random_state=random_state
+            )
 
-        # Train and evaluate models
-        metrics = trainer.train_models(X_train, X_test, y_train, y_test)
+            # Initialize trainer with refined config
+            trainer = ModelTrainer(str(self.config_path))
 
-        # Save results
-        refined_results_path = Path('models/refined_results.yaml')
-        with open(refined_results_path, 'w') as f:
-            yaml.dump(metrics, f, default_flow_style=False)
+            # Train and evaluate models
+            metrics = trainer.train_models(X_train, X_test, y_train, y_test)
 
-        logger.info(f"Refined model results saved to {refined_results_path}")
-        return metrics
+            # Save results
+            refined_results_path = Path('models/refined_results.yaml')
+            with open(refined_results_path, 'w') as f:
+                yaml.dump(metrics, f, default_flow_style=False)
+
+            logger.info(f"Refined model results saved to {refined_results_path}")
+            return metrics
+
+        except Exception as e:
+            logger.error(f"Error in model retraining: {str(e)}")
+            raise
 
 
 def main():
