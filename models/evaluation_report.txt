@@ -6,46 +6,46 @@ ADVANCED MODELS
 --------------------
 
 gradient_boosting:
-  mae: 0.0085
-  mse: 0.0003
-  r2: 0.9997
-  rmse: 0.0175
+  mae: 0.0264
+  mse: 0.0015
+  r2: 0.9983
+  rmse: 0.0394
 
 random_forest:
-  mae: 0.0096
-  mse: 0.0004
-  r2: 0.9996
-  rmse: 0.0203
+  mae: 0.0331
+  mse: 0.0023
+  r2: 0.9976
+  rmse: 0.0476
 
 svr:
-  mae: 0.0386
-  mse: 0.0022
-  r2: 0.9977
-  rmse: 0.0464
+  mae: 0.0497
+  mse: 0.0036
+  r2: 0.9961
+  rmse: 0.0599
 
 BASELINE MODELS
 --------------------
 
 arima:
-  mae: 2.6908
-  mse: 8.1222
-  r2: -7.7734
-  rmse: 2.8500
+  mae: 0.7902
+  mse: 0.9467
+  r2: -0.0226
+  rmse: 0.9730
 
 lasso:
-  mae: 0.7311
-  mse: 0.9264
-  r2: -0.0006
-  rmse: 0.9625
+  mae: 0.1065
+  mse: 0.0202
+  r2: 0.9781
+  rmse: 0.1423
 
 linear:
-  mae: 0.0186
-  mse: 0.0007
-  r2: 0.9993
-  rmse: 0.0257
+  mae: 0.0497
+  mse: 0.0047
+  r2: 0.9949
+  rmse: 0.0688
 
 ridge:
-  mae: 0.0191
-  mse: 0.0007
-  r2: 0.9992
-  rmse: 0.0264
+  mae: 0.0500
+  mse: 0.0048
+  r2: 0.9948
+  rmse: 0.0694

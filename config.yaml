@@ -47,16 +47,21 @@ training:
   time_column: year
   feature_columns:
     - hydro_generation
-    - biofuel_generation
     - solar_generation
-    - geothermal_generation
-    - total_energy_consumption
-    - renewable_share_pct
     - wind_generation
-    - renewable_generation_lag_1
-    - renewable_generation_lag_3
-    - renewable_generation_rolling_mean_3
-    - renewable_generation_rolling_mean_6
+    - total_energy_consumption
 
 baseline_models:
   arima_order: [ 1, 1, 1 ]
+  ridge_alpha: 1.0
+  lasso_alpha: 0.1
+
+advanced_models:
+  rf_n_estimators: 300
+  rf_max_depth: 10
+  rf_min_samples_split: 2
+  gb_n_estimators: 300
+  gb_max_depth: 4
+  gb_learning_rate: 0.1
+  svr_C: 1.0
+  svr_kernel: 'rbf'

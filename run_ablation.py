@@ -35,16 +35,28 @@ def main():
         logger.info(f"Loading data from {data_path}")
         df = pd.read_csv(data_path)
 
+        # Print available columns
+        logger.info("Available columns in data:")
+        logger.info(list(df.columns))
+
         # Get features and target from config
         target_col = ablation.config['training']['target_column']
         feature_cols = ablation.config['training']['feature_columns']
-        time_col = ablation.config['training'].get('time_column', 'year')
 
-        # Include time column in features
-        all_features = feature_cols + [time_col]
+        logger.info(f"Target column from config: {target_col}")
+        logger.info(f"Feature columns from config: {feature_cols}")
+
+        # Basic validation
+        missing_cols = [col for col in feature_cols if col not in df.columns]
+        if missing_cols:
+            logger.error(f"Missing columns in data: {missing_cols}")
+            # Print the first few rows of data to help debug
+            logger.info("First few rows of data:")
+            logger.info(df.head())
+            raise ValueError(f"Missing required columns: {missing_cols}")
 
         # Prepare features and target
-        X = df[all_features]
+        X = df[feature_cols]
         y = df[target_col]
 
         # Run all ablation studies

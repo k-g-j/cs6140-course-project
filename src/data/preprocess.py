@@ -262,43 +262,30 @@ class DataPreprocessor:
     def preprocess_dataset(self, df: pd.DataFrame, config: Dict) -> pd.DataFrame:
         """
         Main preprocessing pipeline.
-
-        Args:
-            df: Input DataFrame
-            config: Dictionary containing preprocessing configurations
-
-        Returns:
-            Fully preprocessed DataFrame
         """
         logger.info("Starting preprocessing pipeline...")
+        logger.info(f"Initial columns: {list(df.columns)}")
 
         df_processed = df.copy()
 
         # Handle missing values
         if config.get('handle_missing', True):
+            logger.info("Handling missing values...")
             df_processed = self.handle_missing_values(
                 df_processed,
                 numeric_strategy=config.get('numeric_missing_strategy', 'knn'),
                 categorical_strategy=config.get('categorical_missing_strategy', 'mode')
             )
 
-        # Remove outliers if specified
-        if config.get('remove_outliers', True):
-            numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
-            df_processed = self.remove_outliers(
-                df_processed,
-                columns=numeric_cols,
-                method=config.get('outlier_method', 'iqr'),
-                threshold=config.get('outlier_threshold', 3.0)
-            )
-
         # Create temporal features
-        time_column = 'year' if 'year' in df_processed.columns else config.get('date_column')
+        time_column = config.get('date_column', 'year')
         if time_column in df_processed.columns:
+            logger.info(f"Creating temporal features from {time_column}")
             df_processed = self.create_temporal_features(df_processed, time_column)
 
         # Create lag features
         if 'target_column' in config and 'lag_periods' in config:
+            logger.info(f"Creating lag features for {config['target_column']}")
             df_processed = self.create_lag_features(
                 df_processed,
                 config['target_column'],
@@ -306,25 +293,7 @@ class DataPreprocessor:
                 config.get('group_column')
             )
 
-        # Create rolling features
-        if 'target_column' in config and 'rolling_windows' in config:
-            df_processed = self.create_rolling_features(
-                df_processed,
-                config['target_column'],
-                config['rolling_windows'],
-                config.get('group_column')
-            )
-
-        # Normalize if specified
-        if config.get('normalize', True):
-            numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
-            df_processed, _ = self.normalize_columns(
-                df_processed,
-                columns=numeric_cols,
-                method=config.get('normalization_method', 'standard')
-            )
-
-        logger.info("Preprocessing pipeline completed successfully")
+        logger.info(f"Final columns after preprocessing: {list(df_processed.columns)}")
         return df_processed
 
 
