@@ -13,6 +13,8 @@ mkdir -p data
 mkdir -p processed_data
 mkdir -p models
 mkdir -p figures
+mkdir -p figures/final_analysis
+mkdir -p analysis_results
 mkdir -p logs
 
 # Check if python environment is set up
@@ -47,6 +49,18 @@ python3 src/models/evaluate.py
 echo -e "\nStep 4: Running ablation studies..."
 python3 run_ablation.py
 
+# Run results analysis
+echo -e "\nStep 5: Running results analysis..."
+python3 analyze_results.py
+
+# Run model refinement
+echo -e "\nStep 6: Running model refinement..."
+python3 refine_models.py
+
+# Create final visualizations
+echo -e "\nStep 7: Creating final visualizations..."
+python3 create_visualizations.py
+
 # Check for errors in log files
 echo -e "\nChecking logs for errors..."
 if grep -i "error" logs/*.log &> /dev/null; then
@@ -63,6 +77,8 @@ echo "Generated files can be found in:"
 echo "- Processed data: ./processed_data/"
 echo "- Model outputs: ./models/"
 echo "- Figures: ./figures/"
+echo "- Analysis results: ./analysis_results/"
+echo "- Final visualizations: ./figures/final_analysis/"
 echo "- Logs: ./logs/"
 echo "========================================="
 
