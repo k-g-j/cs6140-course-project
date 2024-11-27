@@ -10,6 +10,9 @@ echo "========================================="
 echo "Running Renewable Energy Prediction Project"
 echo "========================================="
 
+# Set up Python path to include src directory
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+
 # Create required directories if they don't exist
 echo "Creating required directories..."
 mkdir -p data
@@ -21,22 +24,17 @@ mkdir -p figures/feature_analysis
 mkdir -p analysis_results
 mkdir -p logs
 
-# Check if python environment is set up
-if ! command -v python3 &> /dev/null; then
-    echo "Python 3 is not installed. Please install Python 3 first."
-    exit 1
-fi
-
-# Check if requirements are installed
-if [ ! -f "requirements.txt" ]; then
-    echo "requirements.txt not found!"
-    exit 1
-fi
-
-# Function to check last command's status
+# Function to check last command's status and data files
 check_status() {
     if [ $? -ne 0 ]; then
         echo "Error: $1 failed"
+        exit 1
+    fi
+}
+
+check_data_file() {
+    if [ ! -f "$1" ]; then
+        echo "Error: Required data file $1 not found"
         exit 1
     fi
 }
@@ -48,13 +46,15 @@ check_status "Dependencies installation"
 
 # Run data preprocessing pipeline
 echo -e "\nStep 1: Running data preprocessing pipeline..."
-python3 main.py
+python3 src/main.py
 check_status "Data preprocessing"
+check_data_file "processed_data/final_processed_data.csv"
 
 # Run feature engineering
 echo -e "\nStep 2: Running feature engineering..."
 python3 src/data/feature_engineering.py
 check_status "Feature engineering"
+check_data_file "processed_data/engineered_features.csv"
 
 # Run initial model training
 echo -e "\nStep 3: Running initial model training..."
@@ -87,17 +87,9 @@ python3 create_visualizations.py
 check_status "Visualization creation"
 
 # Generate final report
-echo -e "\nStep 9: Generating final report..."
-python3 analyze_results.py
-check_status "Report generation"
-
-# Check for errors in log files
-echo -e "\nChecking logs for errors..."
-if grep -i "error" logs/*.log &> /dev/null; then
-    echo "WARNING: Errors found in logs. Please check log files in logs directory."
-else
-    echo "No errors found in logs."
-fi
+echo -e "\nStep 9: Generating final report and visualizations..."
+jupyter nbconvert --execute notebooks/*.ipynb --to pdf
+check_status "Notebook conversion"
 
 # Print summary
 echo -e "\n========================================="
@@ -111,6 +103,7 @@ echo "- Analysis results: ./analysis_results/"
 echo "- Final visualizations: ./figures/final_analysis/"
 echo "- Feature analysis: ./figures/feature_analysis/"
 echo "- Logs: ./logs/"
+echo "- Notebooks (PDF): ./notebooks/"
 echo "========================================="
 
 # Record execution timestamp
@@ -118,10 +111,24 @@ echo "Completed at: $(date)" >> logs/execution_history.log
 
 # Final status check
 echo -e "\nChecking final status..."
-if [ -f "models/training_results.yaml" ] && \
-   [ -f "figures/final_analysis/model_comparison.png" ] && \
-   [ -f "analysis_results/analysis_report.md" ]; then
+required_files=(
+    "processed_data/final_processed_data.csv"
+    "processed_data/engineered_features.csv"
+    "models/training_results.yaml"
+    "figures/final_analysis/model_comparison.png"
+    "analysis_results/analysis_report.md"
+)
+
+missing_files=0
+for file in "${required_files[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "WARNING: Missing expected output file: $file"
+        missing_files=$((missing_files + 1))
+    fi
+done
+
+if [ $missing_files -eq 0 ]; then
     echo "All critical outputs generated successfully!"
 else
-    echo "WARNING: Some expected outputs are missing. Please check the logs."
+    echo "WARNING: $missing_files expected output files are missing. Check the logs for errors."
 fi

@@ -323,14 +323,23 @@ def main():
     feature_engineer = FeatureEngineer()
 
     try:
-        # Load your preprocessed data
-        df = pd.read_csv('processed_data.csv')
+        # Load your preprocessed data from the correct path
+        processed_data_path = Path('processed_data') / 'final_processed_data.csv'
+        if not processed_data_path.exists():
+            logger.error(f"Processed data file not found at {processed_data_path}")
+            raise FileNotFoundError(f"Could not find {processed_data_path}")
+
+        logger.info(f"Loading processed data from {processed_data_path}")
+        df = pd.read_csv(processed_data_path)
 
         # Apply feature engineering pipeline with visualizations
         engineered_df = feature_engineer.create_all_features(df, config)
 
-        # Save engineered features
-        engineered_df.to_csv('engineered_features.csv', index=False)
+        # Save engineered features to processed_data directory
+        output_path = Path('processed_data') / 'engineered_features.csv'
+        engineered_df.to_csv(output_path, index=False)
+        logger.info(f"Saved engineered features to {output_path}")
+
         logger.info("Feature engineering and visualizations completed successfully")
 
     except Exception as e:
