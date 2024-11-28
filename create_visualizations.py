@@ -108,7 +108,7 @@ class VisualizationCreator:
         """Create feature importance visualizations."""
         importance_data = {}
         for model_type in ['baseline', 'advanced']:
-            for model_name, model_results in self.results[model_type].items():
+            for model_name, model_results in self.results.get(model_type, {}).items():
                 if 'feature_importances' in model_results:
                     importance_data[f"{model_type}_{model_name}"] = model_results[
                         'feature_importances']
@@ -117,7 +117,8 @@ class VisualizationCreator:
             for model, importances in importance_data.items():
                 # Sort importances
                 sorted_importances = dict(
-                    sorted(importances.items(), key=lambda x: x[1], reverse=True))
+                    sorted(importances.items(), key=lambda x: x[1], reverse=True)
+                )
 
                 # Create bar plot
                 plt.figure(figsize=(12, 6))
@@ -187,21 +188,26 @@ class VisualizationCreator:
             refined_r2 = []
 
             for model_type in ['baseline', 'advanced']:
-                for model_name in self.results[model_type].keys():
-                    if model_name in self.refined_results[model_type]:
+                for model_name in self.results.get(model_type, {}).keys():
+                    if model_name in self.refined_results.get(model_type, {}):
                         models.append(model_name)
                         original_r2.append(self.results[model_type][model_name].get('r2', 0))
                         refined_r2.append(self.refined_results[model_type][model_name].get('r2', 0))
 
+            if not models:
+                logger.warning("No refined model results to compare")
+                return
+
             # Create comparison plot
             width = 0.35
             fig, ax = plt.subplots(figsize=(12, 6))
-            ax.bar(np.arange(len(models)) - width / 2, original_r2, width, label='Original')
-            ax.bar(np.arange(len(models)) + width / 2, refined_r2, width, label='Refined')
+            indices = np.arange(len(models))
+            ax.bar(indices - width / 2, original_r2, width, label='Original')
+            ax.bar(indices + width / 2, refined_r2, width, label='Refined')
 
             ax.set_ylabel('R² Score')
             ax.set_title('Model Performance: Original vs Refined')
-            ax.set_xticks(np.arange(len(models)))
+            ax.set_xticks(indices)
             ax.set_xticklabels(models, rotation=45)
             ax.legend()
 
@@ -243,7 +249,6 @@ def main():
 
     except Exception as e:
         logger.error(f"Visualization creation failed: {str(e)}")
-        logger.error(f"Error: {str(e)}")
         sys.exit(1)
     finally:
         # Cleanup code

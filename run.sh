@@ -50,11 +50,21 @@ validate_outputs() {
     for file in "${required_files[@]}"; do
         if [ ! -f "$file" ]; then
             echo "ERROR: Missing required output file: $file"
+            echo "Possible reasons: The corresponding step failed or was skipped."
+            echo "Check the logs for more details."
             missing=$((missing + 1))
         fi
     done
 
     return $missing
+}
+
+# Function to check for LaTeX installation
+check_latex() {
+    if ! command -v xelatex &> /dev/null; then
+        echo "Error: LaTeX (xelatex) is not installed. Please install it to enable PDF conversion."
+        exit 1
+    fi
 }
 
 # Create required directories
@@ -72,15 +82,19 @@ for dir in data processed_data models figures analysis_results logs notebooks; d
     check_permissions $dir
 done
 
+# Check for LaTeX installation
+check_latex
+
 # Set up Python path
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 # Install/update dependencies
 echo -e "\nInstalling/updating dependencies..."
+pip install --upgrade pip
 pip install -r requirements.txt
 check_status "Dependencies installation"
 
-# Clean up any previous log files
+# Clean up any previous log files older than 7 days
 echo -e "\nCleaning up old log files..."
 find logs -name "*.log" -type f -mtime +7 -delete
 
@@ -146,8 +160,7 @@ convert_notebooks() {
         if [ -f "$notebook" ]; then
             echo "Converting $notebook to PDF..."
             jupyter nbconvert --to pdf "$notebook" \
-                --template lab \
-                --PDFExporter.template_file=lab \
+                --template ./no_bib_template.tplx \
                 || {
                     # Fallback to HTML if PDF conversion fails
                     echo "PDF conversion failed, converting to HTML instead..."

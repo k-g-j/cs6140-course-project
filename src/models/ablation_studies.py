@@ -1,4 +1,5 @@
 """Implementation of ablation studies for renewable energy prediction models."""
+
 import logging
 import sys
 from pathlib import Path
@@ -93,7 +94,7 @@ class AblationStudy:
                 results[group_name] = {
                     'removed_features': features,
                     'performance_impact': impact,
-                    'relative_impact': impact / baseline_score * 100
+                    'relative_impact': (impact / baseline_score) * 100 if baseline_score != 0 else 0
                 }
 
         self.results['feature_importance'] = results
@@ -117,6 +118,7 @@ class AblationStudy:
 
                 X_train, X_test, y_train, y_test = train_test_split(X_processed, y_processed,
                                                                     test_size=0.2, random_state=42)
+                # Update model configuration
                 self.trainer.advanced_models.config = {'rf_n_estimators': n_estimators,
                                                        'rf_max_depth': max_depth}
                 self.trainer.train_models(X_train, X_test, y_train, y_test)
@@ -171,8 +173,9 @@ class AblationStudy:
             sns.barplot(x=feature_names, y=feature_impacts)
             plt.title('Feature Group Importance (% Impact on Performance)')
             plt.xticks(rotation=45)
+            plt.ylabel('Relative Impact (%)')
             plt.tight_layout()
-            plt.savefig(self.output_dir / 'feature_importance_ablation.png')
+            plt.savefig(self.output_dir / 'feature_importance_ablation.png', dpi=300)
             plt.close()
 
         # Model complexity visualization
@@ -187,15 +190,17 @@ class AblationStudy:
             )
 
             sns.heatmap(pivot_data, annot=True, fmt='.3f', cmap='viridis')
-            plt.title('Model Performance vs Complexity')
+            plt.title('Model Performance vs Complexity (Random Forest)')
+            plt.xlabel('Max Depth')
+            plt.ylabel('Number of Estimators')
             plt.tight_layout()
-            plt.savefig(self.output_dir / 'model_complexity_ablation.png')
+            plt.savefig(self.output_dir / 'model_complexity_ablation.png', dpi=300)
             plt.close()
 
         # Data volume visualization
         if 'data_volume' in self.results:
             plt.figure(figsize=(10, 6))
-            volumes = [res['training_size'] for res in self.results['data_volume'].values()]
+            volumes = [res['training_size'] * 100 for res in self.results['data_volume'].values()]
             scores = [res['r2_score'] for res in self.results['data_volume'].values()]
 
             plt.plot(volumes, scores, marker='o')
@@ -204,17 +209,17 @@ class AblationStudy:
             plt.title('Learning Curve - Performance vs Data Volume')
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(self.output_dir / 'data_volume_ablation.png')
+            plt.savefig(self.output_dir / 'data_volume_ablation.png', dpi=300)
             plt.close()
 
     def generate_report(self) -> str:
         """Generate a detailed report of ablation study findings."""
-        report = ["Ablation Studies Report", "=" * 50, ""]
+        report = ["# Ablation Studies Report", "=" * 50, ""]
 
         # Feature importance findings
         if 'feature_importance' in self.results:
             report.extend([
-                "\n1. Feature Importance Analysis",
+                "\n## 1. Feature Importance Analysis",
                 "-" * 30
             ])
 
@@ -225,14 +230,14 @@ class AblationStudy:
             )
 
             for feature, impact in sorted_features:
-                report.append(f"\n{feature}:")
-                report.append(f"  Impact: {impact['relative_impact']:.2f}% performance change")
-                report.append(f"  Features: {', '.join(impact['removed_features'])}")
+                report.append(f"\n### {feature}")
+                report.append(f"- **Performance Impact:** {impact['relative_impact']:.2f}%")
+                report.append(f"- **Removed Features:** {', '.join(impact['removed_features'])}")
 
         # Model complexity findings
         if 'model_complexity' in self.results:
             report.extend([
-                "\n2. Model Complexity Analysis",
+                "\n## 2. Model Complexity Analysis",
                 "-" * 30
             ])
 
@@ -241,15 +246,15 @@ class AblationStudy:
                 key=lambda x: x[1]['r2_score']
             )
 
-            report.append(f"\nBest configuration:")
-            report.append(f"  n_estimators: {best_config[1]['n_estimators']}")
-            report.append(f"  max_depth: {best_config[1]['max_depth']}")
-            report.append(f"  R² score: {best_config[1]['r2_score']:.4f}")
+            report.append(f"\n### Best Configuration:")
+            report.append(f"- **Number of Estimators:** {best_config[1]['n_estimators']}")
+            report.append(f"- **Max Depth:** {best_config[1]['max_depth']}")
+            report.append(f"- **R² Score:** {best_config[1]['r2_score']:.4f}")
 
         # Data volume findings
         if 'data_volume' in self.results:
             report.extend([
-                "\n3. Data Volume Analysis",
+                "\n## 3. Data Volume Analysis",
                 "-" * 30
             ])
 
@@ -257,13 +262,16 @@ class AblationStudy:
             max_score = max(res['r2_score'] for res in volume_results.values())
             min_score = min(res['r2_score'] for res in volume_results.values())
 
-            report.append(f"\nPerformance range:")
-            report.append(f"  Maximum R² (100% data): {max_score:.4f}")
-            report.append(f"  Minimum R² (20% data): {min_score:.4f}")
-            report.append(f"  Performance gain: {((max_score - min_score) / min_score * 100):.1f}%")
+            report.append(f"\n- **Maximum R² (100% data):** {max_score:.4f}")
+            report.append(f"- **Minimum R² (20% data):** {min_score:.4f}")
+            if min_score != 0:
+                performance_gain = ((max_score - min_score) / min_score) * 100
+            else:
+                performance_gain = 0
+            report.append(f"- **Performance Gain:** {performance_gain:.1f}%")
 
         # Save report
-        report_path = self.output_dir / 'ablation_study_report.txt'
+        report_path = self.output_dir / 'ablation_study_report.md'
         with open(report_path, 'w') as f:
             f.write('\n'.join(report))
 
@@ -325,7 +333,7 @@ class AblationStudy:
             report = self.generate_report()
 
             # Save report
-            report_path = self.output_dir / 'ablation_study_report.txt'
+            report_path = self.output_dir / 'ablation_study_report.md'
             with open(report_path, 'w') as f:
                 f.write(report)
 
@@ -345,11 +353,25 @@ def main():
         ablation = AblationStudy(config_path)
 
         # Load processed data
-        df = pd.read_csv('processed_data/final_processed_data.csv')
+        data_path = Path('processed_data/final_processed_data.csv')
+        if not data_path.exists():
+            raise FileNotFoundError(f"Processed data not found at {data_path}")
+
+        logger.info(f"Loading data from {data_path}")
+        df = pd.read_csv(data_path)
 
         # Prepare features and target
         target_col = ablation.config['training']['target_column']
         feature_cols = ablation.config['training']['feature_columns']
+
+        if target_col not in df.columns:
+            logger.error(f"Target column '{target_col}' not found in data.")
+            raise ValueError(f"Target column '{target_col}' not found in data.")
+
+        missing_features = [col for col in feature_cols if col not in df.columns]
+        if missing_features:
+            logger.error(f"Missing feature columns in data: {missing_features}")
+            raise ValueError(f"Missing feature columns in data: {missing_features}")
 
         X = df[feature_cols]
         y = df[target_col]
@@ -359,7 +381,6 @@ def main():
 
     except Exception as e:
         logger.error(f"Ablation studies failed: {str(e)}")
-        logger.error(f"Error: {str(e)}")
         sys.exit(1)
     finally:
         # Cleanup code

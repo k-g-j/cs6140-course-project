@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('ablation.log'),
+        logging.FileHandler('logs/ablation.log'),
         logging.StreamHandler()
     ]
 )
@@ -28,7 +28,7 @@ def main():
         config_path = Path('config.yaml')
         ablation = AblationStudy(str(config_path))
 
-        # Load your processed data
+        # Load processed data
         data_path = Path('processed_data/final_processed_data.csv')
         if not data_path.exists():
             raise FileNotFoundError(f"Processed data not found at {data_path}")
@@ -36,39 +36,27 @@ def main():
         logger.info(f"Loading data from {data_path}")
         df = pd.read_csv(data_path)
 
-        # Print available columns
-        logger.info("Available columns in data:")
-        logger.info(list(df.columns))
-
-        # Get features and target from config
+        # Prepare features and target
         target_col = ablation.config['training']['target_column']
         feature_cols = ablation.config['training']['feature_columns']
 
-        logger.info(f"Target column from config: {target_col}")
-        logger.info(f"Feature columns from config: {feature_cols}")
+        if target_col not in df.columns:
+            logger.error(f"Target column '{target_col}' not found in data.")
+            raise ValueError(f"Target column '{target_col}' not found in data.")
 
-        # Basic validation
-        missing_cols = [col for col in feature_cols if col not in df.columns]
-        if missing_cols:
-            logger.error(f"Missing columns in data: {missing_cols}")
-            # Print the first few rows of data to help debug
-            logger.info("First few rows of data:")
-            logger.info(df.head())
-            raise ValueError(f"Missing required columns: {missing_cols}")
+        missing_features = [col for col in feature_cols if col not in df.columns]
+        if missing_features:
+            logger.error(f"Missing feature columns in data: {missing_features}")
+            raise ValueError(f"Missing feature columns in data: {missing_features}")
 
-        # Prepare features and target
         X = df[feature_cols]
         y = df[target_col]
 
-        # Run all ablation studies
-        logger.info("Starting ablation studies...")
+        # Run ablation studies
         ablation.run_all_studies(X, y)
 
-        logger.info("Ablation studies completed successfully!")
-
     except Exception as e:
-        logger.error(f"Error in ablation studies: {str(e)}")
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Ablation studies failed: {str(e)}")
         sys.exit(1)
     finally:
         # Cleanup code
