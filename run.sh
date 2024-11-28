@@ -76,6 +76,7 @@ mkdir -p figures/{exploration,feature_analysis,final_analysis,models,ablation_st
 mkdir -p analysis_results
 mkdir -p logs
 mkdir -p notebooks
+mkdir -p templates/no_bib_template  # Ensure the templates directory exists
 
 # Check directory permissions
 for dir in data processed_data models figures analysis_results logs notebooks; do
@@ -160,7 +161,7 @@ convert_notebooks() {
         if [ -f "$notebook" ]; then
             echo "Converting $notebook to PDF..."
             jupyter nbconvert --to pdf "$notebook" \
-                --template ./no_bib_template.tplx \
+                --template ./templates/no_bib_template/no_bib_template.j2 \
                 || {
                     # Fallback to HTML if PDF conversion fails
                     echo "PDF conversion failed, converting to HTML instead..."
@@ -180,6 +181,7 @@ check_status "Report generation"
 
 # Validate all outputs
 echo -e "\nValidating outputs..."
+
 validate_outputs
 output_status=$?
 
