@@ -23,19 +23,19 @@ feature_importance:
   economic:
     performance_impact: 0.0
     relative_impact: 0.0
-    removed_features: [ ]
+    removed_features: []
   generation:
     performance_impact: 0.0
     relative_impact: 0.0
-    removed_features: [ ]
+    removed_features: []
   temporal:
     performance_impact: 0.0
     relative_impact: 0.0
-    removed_features: [ ]
+    removed_features: []
   weather:
     performance_impact: 0.0
     relative_impact: 0.0
-    removed_features: [ ]
+    removed_features: []
 model_complexity:
   rf_n100_d10:
     max_depth: 10

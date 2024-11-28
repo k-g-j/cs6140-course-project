@@ -6,30 +6,25 @@
 ------------------------------
 
 ### temporal
-
 - **Performance Impact:** 0.00%
-- **Removed Features:**
+- **Removed Features:** 
 
 ### generation
-
 - **Performance Impact:** 0.00%
-- **Removed Features:**
+- **Removed Features:** 
 
 ### weather
-
 - **Performance Impact:** 0.00%
-- **Removed Features:**
+- **Removed Features:** 
 
 ### economic
-
 - **Performance Impact:** 0.00%
-- **Removed Features:**
+- **Removed Features:** 
 
 ## 2. Model Complexity Analysis
 ------------------------------
 
 ### Best Configuration:
-
 - **Number of Estimators:** 50
 - **Max Depth:** 5
 - **R² Score:** 0.4480
