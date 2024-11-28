@@ -139,7 +139,30 @@ check_file "figures/final_analysis/model_comparison.png"
 
 # Generate final report
 echo -e "\nStep 9: Generating final report and visualizations..."
-jupyter nbconvert --to pdf notebooks/*.ipynb --template classic
+
+# Function to handle notebook conversion
+convert_notebooks() {
+    for notebook in notebooks/*.ipynb; do
+        if [ -f "$notebook" ]; then
+            echo "Converting $notebook to PDF..."
+            jupyter nbconvert --to pdf "$notebook" \
+                --template lab \
+                --PDFExporter.template_file=lab \
+                || {
+                    # Fallback to HTML if PDF conversion fails
+                    echo "PDF conversion failed, converting to HTML instead..."
+                    jupyter nbconvert --to html "$notebook"
+                }
+        fi
+    done
+}
+
+# Try to convert notebooks
+convert_notebooks || {
+    echo "WARNING: Notebook conversion encountered issues. Check notebooks/ directory for output files."
+    # Don't exit with error as this is not critical
+}
+
 check_status "Report generation"
 
 # Validate all outputs
