@@ -1,5 +1,6 @@
 """Implementation of ablation studies for renewable energy prediction models."""
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -268,30 +269,71 @@ class AblationStudy:
         return '\n'.join(report)
 
     def run_all_studies(self, X: pd.DataFrame, y: pd.Series):
-        """Run all ablation studies."""
-        logger.info("Starting ablation studies...")
+        """Run all ablation studies and save results."""
+        try:
+            logger.info("Starting ablation studies...")
 
-        # Run feature importance ablation
-        logger.info("Running feature importance ablation...")
-        self.feature_importance_ablation(X, y)
+            # Create results dictionary
+            results = {
+                'feature_importance': {},
+                'model_complexity': {},
+                'data_volume': {}
+            }
 
-        # Run model complexity ablation
-        logger.info("Running model complexity ablation...")
-        self.model_complexity_ablation(X, y)
+            # Run feature importance ablation
+            logger.info("Running feature importance ablation...")
+            results['feature_importance'] = self.feature_importance_ablation(X, y)
 
-        # Run data volume ablation
-        logger.info("Running data volume ablation...")
-        self.data_volume_ablation(X, y)
+            # Run model complexity ablation
+            logger.info("Running model complexity ablation...")
+            results['model_complexity'] = self.model_complexity_ablation(X, y)
 
-        # Create visualizations
-        logger.info("Generating visualizations...")
-        self.visualize_results()
+            # Run data volume ablation
+            logger.info("Running data volume ablation...")
+            results['data_volume'] = self.data_volume_ablation(X, y)
 
-        # Generate report
-        logger.info("Generating ablation study report...")
-        self.generate_report()
+            # Save results
+            results_path = self.output_dir / 'ablation_results.yaml'
+            self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info("Ablation studies completed successfully!")
+            # Convert numpy types to native Python types
+            def convert_to_native(obj):
+                if isinstance(obj, dict):
+                    return {k: convert_to_native(v) for k, v in obj.items()}
+                elif isinstance(obj, (list, tuple)):
+                    return [convert_to_native(x) for x in obj]
+                elif isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                return obj
+
+            serializable_results = convert_to_native(results)
+
+            with open(results_path, 'w') as f:
+                yaml.dump(serializable_results, f, default_flow_style=False)
+
+            # Create visualizations
+            logger.info("Generating visualizations...")
+            self.visualize_results()
+
+            # Generate report
+            logger.info("Generating ablation study report...")
+            report = self.generate_report()
+
+            # Save report
+            report_path = self.output_dir / 'ablation_study_report.txt'
+            with open(report_path, 'w') as f:
+                f.write(report)
+
+            logger.info("Ablation studies completed successfully!")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in ablation studies: {str(e)}")
+            raise
 
 
 def main():
@@ -316,7 +358,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Ablation studies failed: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

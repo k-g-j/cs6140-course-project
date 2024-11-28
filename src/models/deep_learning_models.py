@@ -1,5 +1,6 @@
 """Implementation of deep learning models for renewable energy prediction."""
 import logging
+import sys
 from typing import Dict
 
 import numpy as np
@@ -233,7 +234,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Error in deep learning models training: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

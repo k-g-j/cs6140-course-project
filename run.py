@@ -1,5 +1,7 @@
 """Main script to run model training pipeline."""
 import logging
+import sys
+from pathlib import Path
 
 import pandas as pd
 from sklearn.impute import SimpleImputer
@@ -18,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 def preprocess_data(df: pd.DataFrame, target_col: str, feature_cols: list, time_col: str):
     """Preprocess data by handling missing values and scaling features."""
+    logger.info("Starting data preprocessing...")
+    logger.info(f"Available columns: {list(df.columns)}")
+    logger.info(f"Requested feature columns: {feature_cols}")
+    logger.info(f"Target column: {target_col}")
+    logger.info(f"Time column: {time_col}")
+
+    # Check if all required columns exist
+    missing_cols = [col for col in feature_cols + [target_col, time_col] if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+
     # Separate features and target
     X = df[feature_cols + [time_col]].copy()
     y = df[target_col].copy()
@@ -47,16 +60,25 @@ def main():
         trainer = ModelTrainer(str(config_path))
 
         # Load data
-        df = pd.read_csv('processed_data/final_processed_data.csv')
+        data_path = Path('processed_data/final_processed_data.csv')
+        if not data_path.exists():
+            raise FileNotFoundError(f"Data file not found: {data_path}")
+
+        logger.info(f"Loading data from {data_path}")
+        df = pd.read_csv(data_path)
 
         # Get features and target
         target_col = trainer.config['training']['target_column']
         feature_cols = trainer.config['training']['feature_columns']
         time_col = trainer.config['training'].get('time_column', 'year')
 
-        # Preprocess data
-        logger.info("Preprocessing data...")
-        X, y = preprocess_data(df, target_col, feature_cols, time_col)
+        try:
+            X, y = preprocess_data(df, target_col, feature_cols, time_col)
+        except ValueError as e:
+            logger.error(f"Error in preprocessing: {str(e)}")
+            logger.info("Available columns in data:")
+            logger.info(list(df.columns))
+            raise
 
         # Split data
         test_size = trainer.config['training'].get('test_size', 0.2)
@@ -80,7 +102,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Training failed: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

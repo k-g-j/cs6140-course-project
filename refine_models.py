@@ -1,5 +1,6 @@
 """Script for refining models based on ablation study results."""
 import logging
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -11,19 +12,15 @@ from sklearn.preprocessing import StandardScaler
 
 from src.models.train import ModelTrainer
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
 
-def convert_to_serializable(obj):
-    """Convert numpy types to Python native types for YAML serialization."""
+def _convert_to_native(obj):
+    """Convert numpy types to native Python types for YAML serialization."""
     if isinstance(obj, dict):
-        return {key: convert_to_serializable(value) for key, value in obj.items()}
+        return {k: _convert_to_native(v) for k, v in obj.items()}
     elif isinstance(obj, list):
-        return [convert_to_serializable(item) for item in obj]
+        return [_convert_to_native(x) for x in obj]
     elif isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
@@ -34,39 +31,28 @@ def convert_to_serializable(obj):
 
 
 class ModelRefiner:
+    """Class to handle model refinement and retraining."""
+
     def __init__(self, config_path: Path):
+        """Initialize ModelRefiner."""
         self.config_path = config_path
         with open(config_path) as f:
             self.config = yaml.safe_load(f)
 
-        # Load ablation results
-        self.ablation_results = self._load_ablation_results()
+        # Load ablation results if they exist
+        self.ablation_path = Path('figures/ablation_studies/ablation_study_report.txt')
+        if self.ablation_path.exists():
+            with open(self.ablation_path) as f:
+                self.ablation_results = f.read()
+        else:
+            self.ablation_results = None
 
         # Initialize preprocessors
         self.imputer = SimpleImputer(strategy='mean')
         self.scaler = StandardScaler()
 
-    def _load_ablation_results(self):
-        """Load ablation study results."""
-        ablation_path = Path('figures/ablation_studies/ablation_study_report.txt')
-        if not ablation_path.exists():
-            logger.warning("No ablation results found")
-            return None
-
-        with open(ablation_path) as f:
-            return f.read()
-
     def preprocess_data(self, X: pd.DataFrame, y: pd.Series) -> tuple:
-        """
-        Preprocess data by handling missing values and scaling features.
-
-        Args:
-            X: Feature DataFrame
-            y: Target Series
-
-        Returns:
-            Tuple of (processed_X, processed_y)
-        """
+        """Preprocess data by handling missing values and scaling."""
         logger.info("Preprocessing data...")
 
         # Handle missing values in features
@@ -98,44 +84,37 @@ class ModelRefiner:
             self.config['training'] = {}
 
         # Update hyperparameters based on ablation findings
-        if self.ablation_results:
-            # Example: If model complexity ablation showed better results with deeper trees
-            rf_params = {
-                'rf_n_estimators': 300,
-                'rf_max_depth': 15,  # Increased from default
-                'rf_min_samples_split': 2
-            }
+        rf_params = {
+            'rf_n_estimators': 300,
+            'rf_max_depth': 15,
+            'rf_min_samples_split': 2
+        }
 
-            gb_params = {
-                'gb_n_estimators': 300,
-                'gb_max_depth': 5,  # Adjusted based on ablation
-                'gb_learning_rate': 0.1
-            }
+        gb_params = {
+            'gb_n_estimators': 300,
+            'gb_max_depth': 5,
+            'gb_learning_rate': 0.1
+        }
 
-            # Update config
-            self.config['advanced_models'] = {
-                **rf_params,
-                **gb_params
-            }
+        # Update config
+        self.config['advanced_models'] = {
+            **rf_params,
+            **gb_params
+        }
 
     def refine_feature_selection(self):
         """Refine feature selection based on importance analysis."""
-        if 'feature_engineering' not in self.config:
-            self.config['feature_engineering'] = {}
+        if 'training' not in self.config:
+            self.config['training'] = {}
 
-        # Example: Update selected features based on importance scores
-        important_features = [
-            'renewable_generation_rolling_mean_3',
-            'renewable_generation_lag_1',
-            'renewable_generation_rolling_mean_6',
-            'renewable_generation_rolling_mean_12',
-            'renewable_generation_lag_3',
-            'hydro_generation',
-            'biofuel_generation',
-            'solar_generation'
+        # Update feature columns to match actual data
+        self.config['training']['feature_columns'] = [
+            'Hydroelectric Power',
+            'Solar Energy',
+            'Wind Energy',
+            'Geothermal Energy',
+            'Biomass Energy'
         ]
-
-        self.config['training']['feature_columns'] = important_features
 
     def save_refined_config(self):
         """Save refined configuration."""
@@ -152,9 +131,6 @@ class ModelRefiner:
             # Preprocess data first
             X_processed, y_processed = self.preprocess_data(X, y)
 
-            # Use the already saved refined config
-            refined_config_path = self.config_path.parent / 'config_refined.yaml'
-
             # Split data
             test_size = self.config['training'].get('test_size', 0.2)
             random_state = self.config['training'].get('random_state', 42)
@@ -166,13 +142,13 @@ class ModelRefiner:
             )
 
             # Initialize trainer with refined config
-            trainer = ModelTrainer(str(refined_config_path))
+            trainer = ModelTrainer(str(self.config_path))
 
             # Train and evaluate models
             metrics = trainer.train_models(X_train, X_test, y_train, y_test)
 
-            # Convert metrics to serializable format
-            serializable_metrics = convert_to_serializable(metrics)
+            # Convert numpy types to Python natives for YAML serialization
+            serializable_metrics = _convert_to_native(metrics)
 
             # Save results
             refined_results_path = Path('models/refined_results.yaml')
@@ -202,11 +178,25 @@ def main():
         refined_config_path = refiner.save_refined_config()
 
         # Load data
-        df = pd.read_csv('processed_data/final_processed_data.csv')
+        data_path = Path('processed_data/final_processed_data.csv')
+        if not data_path.exists():
+            raise FileNotFoundError(f"Could not find processed data at {data_path}")
 
-        # Prepare features and target
-        target_col = refiner.config['training']['target_column']
-        feature_cols = refiner.config['training']['feature_columns']
+        logger.info(f"Loading data from {data_path}")
+        df = pd.read_csv(data_path)
+
+        # Get features and target
+        feature_cols = ['Hydroelectric Power', 'Solar Energy', 'Wind Energy',
+                        'Geothermal Energy', 'Biomass Energy']
+        target_col = 'Total Renewable Energy'
+
+        # Basic validation
+        missing_cols = [col for col in feature_cols if col not in df.columns]
+        if missing_cols:
+            logger.error(f"Missing required columns: {missing_cols}")
+            logger.info("Available columns:")
+            logger.info(list(df.columns))
+            raise ValueError(f"Missing required columns: {missing_cols}")
 
         X = df[feature_cols]
         y = df[target_col]
@@ -218,7 +208,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Model refinement failed: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

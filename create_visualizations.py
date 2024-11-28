@@ -1,5 +1,6 @@
 """Script for creating comprehensive visualizations of model results."""
 import logging
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -242,7 +243,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Visualization creation failed: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

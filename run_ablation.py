@@ -1,6 +1,7 @@
 """Script to run ablation studies on trained models."""
 
 import logging
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -67,7 +68,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Error in ablation studies: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":

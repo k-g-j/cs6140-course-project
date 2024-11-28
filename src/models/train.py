@@ -1,5 +1,6 @@
 """Main training script for renewable energy prediction models."""
 import logging
+import sys
 from pathlib import Path
 from typing import Dict
 
@@ -326,7 +327,11 @@ def main():
 
     except Exception as e:
         logger.error(f"Training failed: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
+    finally:
+        # Cleanup code
+        logger.info("Execution completed")
 
 
 if __name__ == "__main__":
