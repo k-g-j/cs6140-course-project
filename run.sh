@@ -161,7 +161,7 @@ convert_notebooks() {
         if [ -f "$notebook" ]; then
             echo "Converting $notebook to PDF..."
             jupyter nbconvert --to pdf "$notebook" \
-                --template ./templates/no_bib_template/index.tex.j2 \
+                --PDFExporter.bibtex_command="" \
                 || {
                     # Fallback to HTML if PDF conversion fails
                     echo "PDF conversion failed, converting to HTML instead..."
