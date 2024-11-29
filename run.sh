@@ -159,14 +159,11 @@ echo -e "\nStep 9: Generating final report and visualizations..."
 convert_notebooks() {
     for notebook in notebooks/*.ipynb; do
         if [ -f "$notebook" ]; then
-            echo "Converting $notebook to PDF..."
-            jupyter nbconvert --to pdf "$notebook" \
-                --PDFExporter.bib_command="" \
-                || {
-                    # Fallback to HTML if PDF conversion fails
-                    echo "PDF conversion failed, converting to HTML instead..."
-                    jupyter nbconvert --to html "$notebook"
-                }
+            echo "Converting $notebook to HTML..."
+            jupyter nbconvert --to html "$notebook" \
+                --execute \
+                --no-input \
+                --output-dir notebooks
         fi
     done
 }
