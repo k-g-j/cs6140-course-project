@@ -16,6 +16,44 @@ check_status() {
     fi
 }
 
+# Function to check dependencies
+check_dependencies() {
+    local missing=0
+
+    # Check for required LaTeX packages
+    echo "Checking required dependencies..."
+
+    # Check for Python and pip
+    if ! command -v python3 &> /dev/null; then
+        echo "Error: python3 is required but not installed"
+        missing=$((missing + 1))
+    fi
+
+    if ! command -v pip &> /dev/null; then
+        echo "Error: pip is required but not installed"
+        missing=$((missing + 1))
+    fi
+
+    # Check for Jupyter
+    if ! command -v jupyter &> /dev/null; then
+        echo "Error: jupyter is required but not installed"
+        missing=$((missing + 1))
+    fi
+
+    # Check for LaTeX dependencies
+    if ! command -v xelatex &> /dev/null; then
+        echo "Error: xelatex is required but not installed"
+        missing=$((missing + 1))
+    fi
+
+    if ! command -v bibtex &> /dev/null; then
+        echo "Error: bibtex is required but not installed"
+        missing=$((missing + 1))
+    fi
+
+    return $missing
+}
+
 # Function to check if file exists
 check_file() {
     if [ ! -f "$1" ]; then
@@ -31,6 +69,55 @@ check_permissions() {
         echo "Error: No write permission for $dir"
         exit 1
     fi
+}
+
+# Function to cleanup temporary files
+cleanup_temp_files() {
+    echo "Cleaning up temporary files..."
+    rm -f notebook.tex
+    rm -f notebook.aux
+    rm -f notebook.out
+    rm -f notebook.log
+    rm -f texput.log
+    find . -name "*.aux" -type f -delete
+    find . -name "*.log" -type f -delete
+    find . -name "*.out" -type f -delete
+}
+
+# Function to convert notebooks to PDF
+convert_notebooks() {
+    local conversion_errors=0
+
+    for notebook in notebooks/*.ipynb; do
+        if [ -f "$notebook" ]; then
+            echo "Converting $notebook to PDF..."
+
+            # Extract basename for output file
+            local basename=$(basename "$notebook" .ipynb)
+            local output_pdf="notebooks/${basename}.pdf"
+
+            jupyter nbconvert --to pdf "$notebook" \
+                --template=classic \
+                --PDFExporter.verbose=True \
+                --PDFExporter.latex_count=3 \
+                --PDFExporter.template_file=classic \
+                --output-dir="notebooks" || {
+                    echo "Warning: PDF conversion failed for $notebook"
+                    echo "$(date): Failed to convert $notebook to PDF" >> logs/conversion_errors.log
+                    conversion_errors=$((conversion_errors + 1))
+                    continue
+                }
+
+            if [ -f "$output_pdf" ]; then
+                echo "Successfully created $output_pdf"
+            else
+                echo "Warning: PDF file not created for $notebook"
+                conversion_errors=$((conversion_errors + 1))
+            fi
+        fi
+    done
+
+    return $conversion_errors
 }
 
 # Function to validate outputs
@@ -56,16 +143,21 @@ validate_outputs() {
         fi
     done
 
+    # Check if any PDFs were generated
+    if ! ls notebooks/*.pdf >/dev/null 2>&1; then
+        echo "WARNING: No PDF files were generated from notebooks"
+        echo "This may not be critical but should be investigated"
+    fi
+
     return $missing
 }
 
-# Function to check for LaTeX installation
-check_latex() {
-    if ! command -v xelatex &> /dev/null; then
-        echo "Error: LaTeX (xelatex) is not installed. Please install it to enable PDF conversion."
-        exit 1
-    fi
-}
+# Check dependencies before starting
+check_dependencies
+if [ $? -ne 0 ]; then
+    echo "Please install missing dependencies before continuing."
+    exit 1
+fi
 
 # Create required directories
 echo "Creating required directories..."
@@ -76,15 +168,12 @@ mkdir -p figures/{exploration,feature_analysis,final_analysis,models,ablation_st
 mkdir -p analysis_results
 mkdir -p logs
 mkdir -p notebooks
-mkdir -p templates/no_bib_template  # Ensure the templates directory exists
+mkdir -p reports
 
 # Check directory permissions
-for dir in data processed_data models figures analysis_results logs notebooks; do
+for dir in data processed_data models figures analysis_results logs notebooks reports; do
     check_permissions $dir
 done
-
-# Check for LaTeX installation
-check_latex
 
 # Set up Python path
 export PYTHONPATH=$PYTHONPATH:$(pwd)
@@ -152,37 +241,22 @@ python3 create_visualizations.py
 check_status "Visualization creation"
 check_file "figures/final_analysis/model_comparison.png"
 
-# Generate final report
-echo -e "\nStep 9: Generating final report and visualizations..."
+# Generate final report and convert notebooks
+echo -e "\nStep 9: Converting notebooks to PDF..."
 
-# Function to handle notebook conversion
-convert_notebooks() {
-    for notebook in notebooks/*.ipynb; do
-        if [ -f "$notebook" ]; then
-            echo "Converting $notebook to PDF..."
-            jupyter nbconvert --to pdf "$notebook" \
-                --no-input \
-                --execute \
-                --TagRemovePreprocessor.remove_cell_tags='{"remove_cell"}' \
-                --TagRemovePreprocessor.remove_all_outputs_tags='{"remove_output"}' \
-                --PDFExporter.latex_count=3 \
-                --PDFExporter.verbose=True \
-                || echo "Warning: PDF conversion failed for $notebook"
-        fi
-    done
-}
+# Convert notebooks with error handling
+if ! convert_notebooks; then
+    echo "WARNING: Some notebooks failed to convert to PDF"
+    echo "Check logs/conversion_errors.log for details"
+else
+    echo "Notebook conversion completed successfully"
+fi
 
-# Try to convert notebooks
-convert_notebooks || {
-    echo "WARNING: Notebook conversion encountered issues. Check notebooks/ directory for output files."
-    # Don't exit with error as this is not critical
-}
-
-check_status "Report generation"
+# Cleanup temporary files
+cleanup_temp_files
 
 # Validate all outputs
 echo -e "\nValidating outputs..."
-
 validate_outputs
 output_status=$?
 
