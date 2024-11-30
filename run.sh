@@ -159,11 +159,15 @@ echo -e "\nStep 9: Generating final report and visualizations..."
 convert_notebooks() {
     for notebook in notebooks/*.ipynb; do
         if [ -f "$notebook" ]; then
-            echo "Converting $notebook to HTML..."
-            jupyter nbconvert --to html "$notebook" \
-                --execute \
+            echo "Converting $notebook to PDF..."
+            jupyter nbconvert --to pdf "$notebook" \
                 --no-input \
-                --output-dir notebooks
+                --execute \
+                --TagRemovePreprocessor.remove_cell_tags='{"remove_cell"}' \
+                --TagRemovePreprocessor.remove_all_outputs_tags='{"remove_output"}' \
+                --PDFExporter.latex_count=3 \
+                --PDFExporter.verbose=True \
+                || echo "Warning: PDF conversion failed for $notebook"
         fi
     done
 }
