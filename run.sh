@@ -20,36 +20,42 @@ check_status() {
 check_dependencies() {
     local missing=0
 
-    # Check for required LaTeX packages
     echo "Checking required dependencies..."
 
-    # Check for Python and pip
-    if ! command -v python3 &> /dev/null; then
-        echo "Error: python3 is required but not installed"
-        missing=$((missing + 1))
+    # Check for Python packages
+    required_packages=("jupyter" "nbconvert" "jupyter_contrib_nbextensions")
+    for package in "${required_packages[@]}"; do
+        if ! pip show "$package" > /dev/null 2>&1; then
+            echo "Missing Python package: $package"
+            missing=$((missing + 1))
+        fi
+    done
+
+    # Check for system packages based on OS
+    if [ "$(uname)" == "Darwin" ]; then
+        # macOS - check for MacTeX
+        if ! command -v xelatex &> /dev/null; then
+            echo "MacTeX is not installed. Please install it from http://www.tug.org/mactex/"
+            missing=$((missing + 1))
+        fi
+    else
+        # Linux - check for TeX Live packages
+        tex_packages=("texlive-xetex" "texlive-fonts-recommended" "texlive-latex-recommended" "texlive-latex-extra" "pandoc")
+        for package in "${tex_packages[@]}"; do
+            if ! dpkg -l | grep -q "^ii  $package "; then
+                echo "Missing TeX package: $package"
+                missing=$((missing + 1))
+            fi
+        done
     fi
 
-    if ! command -v pip &> /dev/null; then
-        echo "Error: pip is required but not installed"
-        missing=$((missing + 1))
-    fi
-
-    # Check for Jupyter
-    if ! command -v jupyter &> /dev/null; then
-        echo "Error: jupyter is required but not installed"
-        missing=$((missing + 1))
-    fi
-
-    # Check for LaTeX dependencies
-    if ! command -v xelatex &> /dev/null; then
-        echo "Error: xelatex is required but not installed"
-        missing=$((missing + 1))
-    fi
-
-    if ! command -v bibtex &> /dev/null; then
-        echo "Error: bibtex is required but not installed"
-        missing=$((missing + 1))
-    fi
+    # Check for other required commands
+    for cmd in python3 pip jupyter pandoc; do
+        if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed"
+            missing=$((missing + 1))
+        fi
+    done
 
     return $missing
 }
@@ -71,22 +77,39 @@ check_permissions() {
     fi
 }
 
+# Function to create jupyter notebook config
+create_jupyter_config() {
+    mkdir -p ~/.jupyter
+    cat > ~/.jupyter/jupyter_notebook_config.py << EOL
+c = get_config()
+c.PDFExporter.latex_command = ['xelatex', '{filename}']
+c.PDFExporter.template_file = 'latex'
+c.PDFExporter.latex_count = 3
+EOL
+}
+
 # Function to cleanup temporary files
 cleanup_temp_files() {
     echo "Cleaning up temporary files..."
-    rm -f notebook.tex
-    rm -f notebook.aux
-    rm -f notebook.out
-    rm -f notebook.log
-    rm -f texput.log
-    find . -name "*.aux" -type f -delete
-    find . -name "*.log" -type f -delete
-    find . -name "*.out" -type f -delete
+    find . -type f \( \
+        -name "*.aux" -o \
+        -name "*.log" -o \
+        -name "*.out" -o \
+        -name "texput.log" -o \
+        -name "*.toc" -o \
+        -name "*.bbl" -o \
+        -name "*.blg" \
+    \) -delete
 }
 
 # Function to convert notebooks to PDF
 convert_notebooks() {
     local conversion_errors=0
+
+    # Create log directory if it doesn't exist
+    mkdir -p logs
+    touch logs/execution_history.log
+    touch logs/conversion_errors.log
 
     for notebook in notebooks/*.ipynb; do
         if [ -f "$notebook" ]; then
@@ -96,12 +119,13 @@ convert_notebooks() {
             local basename=$(basename "$notebook" .ipynb)
             local output_pdf="notebooks/${basename}.pdf"
 
+            # Use the latex template with proper configuration
             jupyter nbconvert --to pdf "$notebook" \
-                --template=classic \
-                --PDFExporter.verbose=True \
+                --template=latex \
+                --PDFExporter.latex_command=['xelatex', '{filename}'] \
                 --PDFExporter.latex_count=3 \
-                --PDFExporter.template_file=classic \
-                --output-dir="notebooks" || {
+                --no-input \
+                --output-dir="notebooks" 2>> logs/conversion_errors.log || {
                     echo "Warning: PDF conversion failed for $notebook"
                     echo "$(date): Failed to convert $notebook to PDF" >> logs/conversion_errors.log
                     conversion_errors=$((conversion_errors + 1))
@@ -146,7 +170,7 @@ validate_outputs() {
     # Check if any PDFs were generated
     if ! ls notebooks/*.pdf >/dev/null 2>&1; then
         echo "WARNING: No PDF files were generated from notebooks"
-        echo "This may not be critical but should be investigated"
+        echo "Check logs/conversion_errors.log for details"
     fi
 
     return $missing
@@ -158,6 +182,9 @@ if [ $? -ne 0 ]; then
     echo "Please install missing dependencies before continuing."
     exit 1
 fi
+
+# Create jupyter notebook config
+create_jupyter_config
 
 # Create required directories
 echo "Creating required directories..."
@@ -182,6 +209,7 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)
 echo -e "\nInstalling/updating dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
+pip install nbconvert[webpdf]
 check_status "Dependencies installation"
 
 # Clean up any previous log files older than 7 days
@@ -245,7 +273,10 @@ check_file "figures/final_analysis/model_comparison.png"
 echo -e "\nStep 9: Converting notebooks to PDF..."
 
 # Convert notebooks with error handling
-if ! convert_notebooks; then
+convert_notebooks
+conversion_status=$?
+
+if [ $conversion_status -ne 0 ]; then
     echo "WARNING: Some notebooks failed to convert to PDF"
     echo "Check logs/conversion_errors.log for details"
 else
