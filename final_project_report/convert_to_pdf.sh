@@ -6,8 +6,8 @@
 set -e
 
 # Variables
-INPUT_MD="final_project_report.md"
-OUTPUT_PDF="final_project_report.pdf"
+INPUT_MD="group_15_johnson_final_report.md"
+OUTPUT_PDF="group_15_johnson_final_report.pdf"
 LUA_FILTER="mermaid.lua"
 
 # Check for required tools
