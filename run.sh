@@ -86,44 +86,89 @@ check_permissions() {
     fi
 }
 
-# Function to setup notebook conversion environment
+# Function to setup notebook conversion environment and dependencies
 setup_notebook_conversion() {
-    echo "Setting up notebook conversion..."
-    pip install --quiet "notebook<7.0.0" nbconvert jupyter_contrib_nbextensions
-    jupyter contrib nbextension install --user --quiet
+    echo "Setting up notebook conversion environment..."
+    mkdir -p logs/notebook_conversion
+    local log_file="logs/notebook_conversion/setup.log"
 
-    mkdir -p ~/.jupyter
-    if [ ! -f ~/.jupyter/jupyter_notebook_config.py ]; then
-        cp jupyter_notebook_config.py ~/.jupyter/jupyter_notebook_config.py
+    # Log all commands and their output
+    {
+        echo "=== Starting notebook setup at $(date) ==="
+        echo "Installing required packages..."
+        pip install --quiet "notebook<7.0.0" nbconvert jupyter_contrib_nbextensions
+
+        echo "Installing nbextensions..."
+        # Install the extensions
+        jupyter contrib nbextension install --user --quiet
+        jupyter nbextension enable --user --quiet
+
+        echo "Setting up jupyter config..."
+        mkdir -p ~/.jupyter
+        if [ ! -f ~/.jupyter/jupyter_notebook_config.py ]; then
+            echo "Initializing jupyter notebook config..."
+            jupyter notebook --generate-config
+            if [ -f "jupyter_notebook_config.py" ]; then
+                cp jupyter_notebook_config.py ~/.jupyter/
+            fi
+        fi
+    } >> "$log_file" 2>&1
+
+    if ! jupyter --version >> "$log_file" 2>&1; then
+        echo "Error with jupyter installation - check $log_file for details"
+        return 1
     fi
-    echo "✓ Notebook setup complete"
+
+    echo "✓ Setup complete"
+    return 0
 }
 
 # Function to convert notebooks to PDF
 convert_notebooks() {
+    echo "Starting notebook conversion..."
     local conversion_errors=0
-    mkdir -p logs
-    touch logs/conversion.log
 
-    echo "Converting notebooks to PDF..."
-    for notebook in notebooks/*.ipynb; do
-        if [ -f "$notebook" ]; then
-            basename=$(basename "$notebook" .ipynb)
-            jupyter nbconvert --to pdf "$notebook" --output-dir="notebooks" >> logs/conversion.log 2>&1 || {
-                jupyter nbconvert --to html "$notebook" --template basic --output-dir="notebooks" >> logs/conversion.log 2>&1 && \
-                pandoc "notebooks/${basename}.html" -o "notebooks/${basename}.pdf" --pdf-engine=xelatex -V geometry:margin=1in >> logs/conversion.log 2>&1 && \
-                rm "notebooks/${basename}.html"
+    # Check if there are any notebooks
+    shopt -s nullglob
+    notebooks=(notebooks/*.ipynb)
+    if [ ${#notebooks[@]} -eq 0 ]; then
+        echo "No notebooks found in notebooks directory"
+        return 0
+    fi
+
+    # Process each notebook
+    for notebook in "${notebooks[@]}"; do
+        basename=$(basename "$notebook" .ipynb)
+        local log_file="logs/notebook_conversion/${basename}_conversion.log"
+
+        echo "Converting ${basename}..."
+        {
+            echo "=== Starting conversion of ${basename} at $(date) ==="
+            echo "Attempting PDF conversion..."
+            jupyter nbconvert --to pdf "${notebook}" --output-dir="notebooks" || {
+                echo "PDF conversion failed, trying HTML path..."
+                if jupyter nbconvert --to html "${notebook}" --template basic --output-dir="notebooks" && \
+                   pandoc "notebooks/${basename}.html" -o "notebooks/${basename}.pdf" --pdf-engine=xelatex -V geometry:margin=1in; then
+                    echo "HTML->PDF conversion successful"
+                    rm -f "notebooks/${basename}.html"
+                else
+                    echo "All conversion attempts failed"
+                    conversion_errors=$((conversion_errors + 1))
+                fi
             }
+        } >> "$log_file" 2>&1
+
+        if [ -f "notebooks/${basename}.pdf" ]; then
+            echo "✓ Created ${basename}.pdf"
+        else
+            echo "⚠ Failed to convert ${basename} - check $log_file for details"
         fi
     done
 
-    # Check results without showing detailed output
-    local pdfs=(notebooks/*.pdf)
-    if [ ${#pdfs[@]} -gt 0 ]; then
-        echo "✓ Notebooks converted successfully"
+    if [ $conversion_errors -eq 0 ]; then
+        echo "✓ All notebook conversions completed successfully"
     else
-        echo "⚠ Notebook conversion failed - check logs/conversion.log"
-        conversion_errors=1
+        echo "⚠ ${conversion_errors} notebook conversion(s) failed - check logs/notebook_conversion/ for details"
     fi
 
     return $conversion_errors
@@ -158,9 +203,9 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 # Install dependencies
 echo "Installing dependencies..."
-pip install --quiet --upgrade pip wheel setuptools
-pip install --quiet pyzmq==25.1.2
-pip install --quiet -r requirements.txt
+pip install --quiet --upgrade pip wheel setuptools > logs/pip_install.log 2>&1
+pip install --quiet pyzmq==25.1.2 >> logs/pip_install.log 2>&1
+pip install --quiet -r requirements.txt >> logs/pip_install.log 2>&1
 echo "✓ Dependencies installed"
 
 echo -e "\nExecuting pipeline stages:"
@@ -214,15 +259,15 @@ echo "✓ Visualizations created"
 
 # Generate final report and convert notebooks
 echo "9. Converting notebooks..."
-setup_notebook_conversion
-convert_notebooks
-conversion_status=$?
+mkdir -p logs/notebook_conversion
 
-if [ $conversion_status -ne 0 ]; then
-    echo "⚠ Some notebook conversions failed - check logs/conversion_errors.log"
-else
-    echo "✓ Notebook conversion complete"
-fi
+# Attempt conversion
+setup_notebook_conversion && {
+    convert_notebooks
+    echo "✓ Notebook processing complete"
+} || {
+    echo "⚠ Notebook conversion encountered errors - check logs for details"
+}
 
 # Print summary
 echo -e "\n========================================="
@@ -240,9 +285,4 @@ echo "- Notebooks (PDF): ./notebooks/"
 # Record completion
 echo "Completed at: $(date)" >> logs/execution_history.log
 
-# Exit with appropriate status
-if [ $conversion_status -eq 0 ]; then
-    exit 0
-else
-    exit 1
-fi
+exit 0

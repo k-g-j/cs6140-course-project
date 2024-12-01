@@ -1,38 +1,60 @@
 # Renewable Energy Adoption Rate Prediction
 
-A machine learning project for predicting and analyzing renewable energy adoption rates across countries.
+A machine learning project for predicting and analyzing renewable energy adoption rates across countries using historical data, economic indicators,
+and weather patterns.
 
 ## Overview
 
-This project implements a comprehensive machine learning pipeline to predict renewable energy adoption patterns using historical data, economic
-indicators, and weather patterns. It includes data preprocessing, feature engineering, model training, and evaluation components.
+This project implements a comprehensive machine learning pipeline to predict renewable energy adoption patterns. The system leverages multiple data
+sources and employs various machine learning techniques, from traditional statistical methods to advanced deep learning approaches, to analyze and
+predict renewable energy adoption trends.
+
+Key features:
+
+- Advanced feature engineering with temporal and weather patterns
+- Multiple model implementations (baseline, advanced, and ensemble)
+- Comprehensive ablation studies and model refinement
+- Detailed visualizations and analysis reports
 
 ## Project Structure
 
 ```
 .
+├── analysis_results/           # Analysis outputs and reports
 ├── data/                      # Raw data storage
 │   ├── Global Energy Consumption & Renewable Generation/
 │   ├── Renewable Energy World Wide 1965-2022/
 │   ├── energy_dataset_.csv
 │   ├── renewable_energy_and_weather_conditions.csv
 │   └── us_renewable_energy_consumption.csv
-├── processed_data/            # Processed and engineered data
-├── models/                    # Trained models and results
 ├── figures/                   # Generated visualizations
 │   ├── ablation_studies/     # Ablation study results
 │   ├── exploration/          # Data exploration plots
 │   ├── feature_analysis/     # Feature analysis plots
 │   ├── final_analysis/       # Final results visualization
 │   └── models/               # Model performance plots
-├── notebooks/                 # Jupyter notebooks
+├── final_project_report/     # Final report and diagrams
+├── logs/                     # Execution and error logs
+├── models/                   # Trained models and results
+├── notebooks/                # Jupyter notebooks
 │   ├── 01_data_exploration.ipynb
 │   └── 02_feature_analysis.ipynb
-├── src/                      # Source code
-│   ├── data/                # Data processing modules
-│   └── models/              # Model implementations
-├── logs/                    # Execution logs
-└── requirements.txt         # Project dependencies
+├── presentation/            # Project presentation files
+├── processed_data/         # Processed and engineered data
+├── src/                    # Source code
+│   ├── data/              # Data processing modules
+│   │   ├── feature_engineering.py
+│   │   ├── load_data.py
+│   │   └── preprocess.py
+│   └── models/            # Model implementations
+│       ├── ablation_studies.py
+│       ├── advanced_models.py
+│       ├── baseline_models.py
+│       ├── deep_learning_models.py
+│       ├── ensemble_models.py
+│       ├── evaluate.py
+│       └── train.py
+└── requirements.txt        # Project dependencies
 ```
 
 ## Prerequisites
@@ -41,6 +63,7 @@ indicators, and weather patterns. It includes data preprocessing, feature engine
 - pip package manager
 - LaTeX installation (for PDF report generation)
 - Git
+- At least 8GB RAM recommended
 
 ## Installation
 
@@ -50,7 +73,7 @@ indicators, and weather patterns. It includes data preprocessing, feature engine
    cd cs6140-course-project
    ```
 
-2. Create and activate a virtual environment (recommended):
+2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -60,6 +83,18 @@ indicators, and weather patterns. It includes data preprocessing, feature engine
    ```bash
    pip install -r requirements.txt
    ```
+
+4. Install additional LaTeX dependencies (for PDF generation):
+    - On Ubuntu/Debian:
+      ```bash
+      sudo apt-get install texlive-xetex texlive-fonts-recommended texlive-latex-recommended
+      ```
+    - On macOS:
+      ```bash
+      brew install mactex
+      ```
+    - On Windows:
+        - Install MiKTeX from https://miktex.org/download
 
 ## Running the Project
 
@@ -80,6 +115,8 @@ This will:
 - Execute feature engineering
 - Train and evaluate models
 - Generate visualizations and reports
+- Convert notebooks to PDF
+- Generate the final report
 
 ### Option 2: Step-by-Step Execution
 
@@ -118,6 +155,12 @@ This will:
    python create_visualizations.py
    ```
 
+8. Generate Final Report:
+   ```bash
+   cd final_project_report
+   ./convert_to_pdf.sh
+   ```
+
 ## Output Files
 
 After execution, you'll find:
@@ -127,6 +170,7 @@ After execution, you'll find:
 - Visualizations in `figures/`
 - Analysis reports in `analysis_results/`
 - Execution logs in `logs/`
+- Final report in `final_project_report/final_project_report.pdf`
 
 ## Jupyter Notebooks
 
@@ -147,7 +191,8 @@ For interactive data exploration and analysis:
 The project behavior can be customized through:
 
 - `config.yaml`: Main configuration file
-- `config_refined.yaml`: Refined model parameters
+- `config_refined.yaml`: Refined model parameters after ablation studies
+- `jupyter_notebook_config.py`: Jupyter notebook settings
 
 ## Troubleshooting
 
@@ -156,19 +201,58 @@ Common issues and solutions:
 1. Missing data files:
     - Ensure all required datasets are in the `data/` directory
     - Check file permissions
+    - Verify CSV file encodings are UTF-8
 
 2. Memory errors:
-    - Increase available RAM
+    - Increase available RAM (8GB minimum recommended)
     - Reduce batch sizes in configuration
+    - Check for memory leaks in preprocessing
 
 3. LaTeX errors:
     - Ensure LaTeX is properly installed
     - Check LaTeX logs in the output directory
+    - Verify all required LaTeX packages are installed
+
+4. Notebook conversion errors:
+    - Check logs in `logs/notebook_conversion/`
+    - Verify Jupyter installation
+    - Install missing Jupyter extensions
+
+## Project Components
+
+### Data Processing
+
+- Feature engineering with temporal patterns
+- Weather data integration
+- Economic indicator processing
+
+### Models Implemented
+
+- Baseline: Linear Regression, Ridge, Lasso, ARIMA
+- Advanced: Random Forest, Gradient Boosting, SVR
+- Deep Learning: LSTM, CNN
+- Ensemble Methods: Stacking, Voting
+
+### Analysis Tools
+
+- Comprehensive ablation studies
+- Feature importance analysis
+- Model performance visualization
+- Time series analysis
 
 ## License
 
 MIT License - see LICENSE file for details.
 
-## Author
+## Authors
 
 Kate Johnson - CS6140 Machine Learning Course Project
+
+## References
+
+Key papers and resources:
+
+- Predicting Energy Consumption Using LSTM, Multi-Layer GRU and Drop-GRU Neural Networks
+- Energy forecasting in smart grid systems
+- Machine learning models for forecasting power electricity consumption
+- Intelligent deep learning techniques for energy consumption forecasting
