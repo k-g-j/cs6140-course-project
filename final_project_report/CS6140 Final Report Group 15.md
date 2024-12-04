@@ -2,7 +2,8 @@
 
 **CS6140 Final Project Report by Group 15**  
 *Kate Johnson*  
-*Khoury College of Computer Science*
+*GitHub Repository: https://github.com/k-g-j/cs6140-course-project*  
+*Khoury College of Computer Science*  
 *Northeastern University*
 
 ## Abstract
